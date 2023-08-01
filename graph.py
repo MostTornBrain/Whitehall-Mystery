@@ -2,7 +2,7 @@ from graph_tool.all import *
 from graph_data import *
 from jack import *
 
-ug = Graph(edge_list, hashed=True, eprops=[("weight", "int"), ("transportation", "int")])
+ug = Graph(edge_list, hashed=True, eprops=[("weight", "int"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
 vshape = ug.new_vp("string")
@@ -77,21 +77,40 @@ graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vs
               edge_marker_size=4,
               edge_control_points=control,
               output="graph-draw.pdf")
+
 '''
 # Test finding shortest path between two nodes
-v1 = find_vertex(ug, ug.vp.ids, "64")[0]
-v2 = find_vertex(ug, ug.vp.ids, "67")[0]
+v1 = find_vertex(ug, ug.vp.ids, "1")[0]
+v2 = find_vertex(ug, ug.vp.ids, "2")[0]
 
 vlist, elist = shortest_path(ug, v1, v2, weights=ug.ep.weight)
 print([ug.vp.ids[v] for v in vlist])
+print(shortest_distance(ug, v1, v2, weights=ug.ep.weight))
+'''
+
+'''
+v = find_vertex(ug, ug.vp.ids, "1c2")[0]
+
+print(ug.ep.transport.a)
+for e in v.all_edges():
+    print(e)
+    print (ug.ep.weight[e])
+    ug.ep.weight[e] += 10
+    print (ug.ep.weight[e])
+    print()
+
+print(ug.edge_properties["weight"].a)
 '''
               
-ipos = ["1c2", "57c1", "64c2"]
+ipos = ["1c2", "36c1", "29c1"]
 
 jack_pos = "1"
 jack_target = "46"
-print ("Jack starts at " + jack_pos)
+print ("Jack starts at " + jack_pos + " and is " + str(shortest_distance(ug, find_vertex(ug, ug.vp.ids, jack_pos)[0], find_vertex(ug, ug.vp.ids, jack_target)[0], weights=ug.ep.weight)) + " away.")
 
 while jack_pos != jack_target:
     move_inspectors(ug, ipos, jack_pos)
     jack_pos = move_jack(ug, ipos, jack_pos, jack_target)
+
+# Save it so I can debug the contents to make sure I'm building it correctly
+ug.save("my_graph_after.graphml")

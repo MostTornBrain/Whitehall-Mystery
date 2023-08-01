@@ -10,18 +10,17 @@ def poison(g, ipos, adjust):
     for num in range (0, 3):
         v = find_vertex(g, g.vp.ids, ipos[num])[0]
         
-        for e in g.iter_out_edges(v):
+        for e in v.all_edges():
+            #print ("Adjusting: " + str(g.ep.weight[e]))
             g.ep.weight[e] += adjust
-        
-        for e in g.iter_in_edges(v):
-            g.ep.weight[e] += adjust
+            #print ("    New: " + str(g.ep.weight[e]))
 
 def move_jack(g, ipos, pos, target):
     
     v1 = find_vertex(g, g.vp.ids, pos)[0]
     v2 = find_vertex(g, g.vp.ids, target)[0]
     
-    # TODO: Poison the position of the inspectors (i.e. add weights)
+    # Poison the position of the inspectors (i.e. add weights)
     poison(g, ipos, 1000)
     
     vlist, elist = shortest_path(g, v1, v2, weights=g.ep.weight)
@@ -29,8 +28,10 @@ def move_jack(g, ipos, pos, target):
     
     pos = find_next_location(vlist, g.vp.ids)
     
-    print("\nJack moves to -> " + pos)
+    #unposion the ipos edges
     poison(g, ipos, -1000)
+    
+    print("\nJack moves to -> " + pos + " and is " + str(shortest_distance(g, find_vertex(g, g.vp.ids, pos)[0], v2, weights=g.ep.weight)) + " away.")
     return pos
 
 

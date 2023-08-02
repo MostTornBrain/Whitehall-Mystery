@@ -47,6 +47,7 @@ for num in water:
 # Assign the x-y coordinates of everything
 vpos = ug.new_vp("vector<double>")
 for pair in positions:
+    #print(pair)
     v=find_vertex(ug, ug.vp.ids, pair[0])[0]
     vpos[v] = pair[1]
 
@@ -79,33 +80,19 @@ graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vs
               output="graph-draw.pdf")
 
 '''
-# Test finding shortest path between two nodes
-v1 = find_vertex(ug, ug.vp.ids, "1")[0]
-v2 = find_vertex(ug, ug.vp.ids, "2")[0]
-
-vlist, elist = shortest_path(ug, v1, v2, weights=ug.ep.weight)
-print([ug.vp.ids[v] for v in vlist])
-print(shortest_distance(ug, v1, v2, weights=ug.ep.weight))
-'''
-
-'''
 v = find_vertex(ug, ug.vp.ids, "1c2")[0]
 
-print(ug.ep.transport.a)
-for e in v.all_edges():
-    print(e)
-    print (ug.ep.weight[e])
-    ug.ep.weight[e] += 10
-    print (ug.ep.weight[e])
-    print()
+print(ug.ep.weight.a)
+for e,f in ug.iter_all_edges(v):
+    print(e,f)
 
 print(ug.edge_properties["weight"].a)
 '''
               
-ipos = ["1c2", "36c1", "29c1"]
+ipos = ["87c1", "91c1", "77c1"]
 
-jack_pos = "1"
-jack_target = "46"
+jack_pos = "79"
+jack_target = "71"
 print ("Jack starts at " + jack_pos + " and is " + str(shortest_distance(ug, find_vertex(ug, ug.vp.ids, jack_pos)[0], find_vertex(ug, ug.vp.ids, jack_target)[0], weights=ug.ep.weight)) + " away.")
 
 while jack_pos != jack_target:

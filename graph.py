@@ -91,13 +91,37 @@ print(ug.edge_properties["weight"].a)
               
 ipos = ["87c1", "91c1", "77c1"]
 
-jack_pos = "79"
-jack_target = "71"
-print ("Jack starts at " + jack_pos + " and is " + str(shortest_distance(ug, find_vertex(ug, ug.vp.ids, jack_pos)[0], find_vertex(ug, ug.vp.ids, jack_target)[0], weights=ug.ep.weight)) + " away.")
-
+'''
 while jack_pos != jack_target:
     move_inspectors(ug, ipos, jack_pos)
     jack_pos = move_jack(ug, ipos, jack_pos, jack_target)
+'''
 
-# Save it so I can debug the contents to make sure I'm building it correctly
+jack = Jack(ug, ipos, godmode=True);
+
+def process_input(user_input):
+    if user_input == "jack":
+        jack.move()
+    elif user_input == "godmode on":
+        jack.set_godmode(True)
+    elif user_input == "godmode off":
+        jack.set_godmode(False)
+    elif "ipos" in user_input:
+        #TODO set new ipos
+        print(user_input) 
+    else:
+        print("Unknown command.")
+
+# Input loop
+while True:
+    user_input = input("> ")
+    
+    if user_input == "exit":
+        print("Goodbye!")
+        break
+
+    process_input(user_input)
+
+# Save the graph so I can debug the contents to make sure I'm 
+# building it correctly and restoring weights correctly
 ug.save("my_graph_after.graphml")

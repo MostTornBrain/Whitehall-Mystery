@@ -1,36 +1,55 @@
 from graph_tool.all import *
+from graph_data import *
+import random
 
 class Jack:
     def __init__(self, g, ipos, godmode):
         self.graph = g
-        self.ipos = ipos
         self.godmode = godmode
+        self.ipos = ipos
+        self.reset()
+
+    def reset(self):
+        self.targets = []
+        self.crimes = []
+        self.clues = []
         
-        self.pos = ""
-        self.target = []
-        self.target_quad = 0
-        self.completed_target = []
-        self.quads_remaining = [1, 2]  # TODO: add 3, 4 when the map is finished being entered
+        for q in quads:
+            self.targets.append(random.choice(q))
+        # TODO: For now, only use two quads since the whole map has been entered
+        del self.targets[3];
+        del self.targets[2];
+        if (self.godmode):
+            print("Jack shall visit ", self.targets)
         
-        #TODO: choose target via choose_new_target()
-        # right now just hardcode one for testing
-        self.pos = "79"
-        self.target = "71"
-        self.target_quad = 1
-        self.completed_targets = ["79"]
-        self.quads_remaining = [ 3, 4]
+        # Determine starting position and announce it
+        self.choose_closest_target()
+        self.pos = self.active_target
+        self.targets.remove(self.pos)
+        self.crimes = [self.pos]
+        self.path_used = [self.pos]
+        print("Jack commits a crime at ", self.pos)
+        
+        self.choose_closest_target()
+        self.completed_targets = [self.pos]
         
         if (self.godmode):
             print ("Jack starts at " + self.pos + " and is " + str(shortest_distance(g, find_vertex(g, g.vp.ids, self.pos)[0], 
-                find_vertex(g, g.vp.ids, self.target)[0], weights=g.ep.weight)) + " away.")
-
-    def choose_new_target(self):
-        # Figure out which quadrants haven't been completed and choose the optimal one
-        # based on current location and investigator positions
-        print("Not implemented yet")
-
+                find_vertex(g, g.vp.ids, self.active_target)[0], weights=g.ep.weight)) + " away.")
+        
+    def choose_closest_target(self):
+        # TODO: choose the optimal target based on current location and investigator positions
+        # For now it is random
+        self.active_target = random.choice(self.targets)
+        if (self.godmode):
+            print("Jack chooses ", self.active_target)
+        
     def set_godmode(self, b):
         self.godmode = b
+
+    def set_ipos(self, i):
+        self.ipos = i
+        print("ipos: ", self.ipos)
 
     def find_next_location(self, vlist):
         index = 1
@@ -47,12 +66,20 @@ class Jack:
                 self.graph.ep.weight[e] += adjust
                 #print ("    New: " + str(g.ep.weight[e]))
 
-        
+    def status(self):
+        print()
+        print("Crimes: ", self.crimes)
+        print("Clues: ", self.clues)
+        print("ipos: ", self.ipos)
+        print("Moves remaining: ", 16 - len(self.path_used))
+        print
         
     def move(self):
+        # Always consider what is the best target to try
+        self.choose_closest_target()
     
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, self.target)[0]
+        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
     
         # Poison the position of the inspectors (i.e. add weights)
         self.poison(1000)
@@ -62,7 +89,8 @@ class Jack:
             print([self.graph.vp.ids[v] for v in vlist])
     
         self.pos = self.find_next_location(vlist)
-    
+        self.path_used.append(self.pos)
+        
         # un-poison the ipos edges
         self.poison(-1000)
         
@@ -71,14 +99,20 @@ class Jack:
                 str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
                                                             weights=self.graph.ep.weight)) + " away.")
         
-        if self.pos == self.target:
+        if self.pos == self.active_target:
             print("Jack has committed a crime at ", self.pos)
-            self.completed_targets.append(self.target)
-            self.choose_new_target()
+            print("Here is the path he took:", self.path_used)
+            self.crimes.append(self.pos)
+            self.path_used = [self.pos]
+            self.targets.remove(self.pos)
+            if len(self.targets) > 0:
+                self.choose_closest_target()
 
-    def do(self):
-        self.move()
-        
+        if (len(self.targets) == 0):
+            print("Game over!  Jack won!")
+            print("    Crime locations: ", self.crimes)
+        else:
+            print("Jack has ", 16 - len(self.path_used), " moves remaining.")
 
 '''
     def find_next_ilocation(self, vlist, id_list):

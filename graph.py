@@ -1,6 +1,6 @@
 from graph_tool.all import *
-from graph_data import *
 from jack import *
+import re
 
 ug = Graph(edge_list, hashed=True, eprops=[("weight", "int"), ("transport", "int")])
 
@@ -22,22 +22,11 @@ for node in ug.vertices():
         vsize[node] = 18
         vfsize[node] = 10
 
-# Color all the destinations in the four quadrant white
-for num in q1:
-    v=find_vertex(ug, ug.vp.ids, num)[0]    
-    vcolor[v] = "#ffffff"
-
-for num in q2:
-    v=find_vertex(ug, ug.vp.ids, num)[0]    
-    vcolor[v] = "#ffffff"
-
-for num in q3:
-    v=find_vertex(ug, ug.vp.ids, num)[0]    
-    vcolor[v] = "#ffffff"
-
-for num in q4:
-    v=find_vertex(ug, ug.vp.ids, num)[0]    
-    vcolor[v] = "#ffffff"
+# Color all the destinations in the four quadrants white
+for q in quads:
+    for num in q:
+        v=find_vertex(ug, ug.vp.ids, num)[0]    
+        vcolor[v] = "#ffffff"
 
 # Make water destinations blue
 for num in water:
@@ -79,36 +68,53 @@ graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vs
               edge_control_points=control,
               output="graph-draw.pdf")
 
-'''
-v = find_vertex(ug, ug.vp.ids, "1c2")[0]
+##########################################
 
-print(ug.ep.weight.a)
-for e,f in ug.iter_all_edges(v):
-    print(e,f)
+ipos = ["87c1", "77c1", "86c1"]
+jack = Jack(ug, ipos, godmode=False);
 
-print(ug.edge_properties["weight"].a)
-'''
-              
-ipos = ["87c1", "91c1", "77c1"]
+##########################################
 
-'''
-while jack_pos != jack_target:
-    move_inspectors(ug, ipos, jack_pos)
-    jack_pos = move_jack(ug, ipos, jack_pos, jack_target)
-'''
-
-jack = Jack(ug, ipos, godmode=True);
+def parse_ipos(user_input):
+    # Use regular expression to match the alphanumeric values
+    match = re.search(r'ipos\s(.+)', user_input)
+    values = []
+    # Extract the alphanumeric values
+    if match:
+        values = match.group(1).split(',')
+        values = [value.strip() for value in values]
+        for value in values:
+            if 'c' not in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+                values = []
+                print(value, " is not a valid inspector location.")
+                break;
+    return values;
 
 def process_input(user_input):
     if user_input == "jack":
         jack.move()
+        
+    elif user_input == "reset":
+        jack.reset()
+        
     elif user_input == "godmode on":
         jack.set_godmode(True)
+        
     elif user_input == "godmode off":
         jack.set_godmode(False)
+        
     elif "ipos" in user_input:
-        #TODO set new ipos
-        print(user_input) 
+        values = parse_ipos(user_input)
+        if (len(values) == 3):
+            jack.set_ipos(values)
+        else:
+            print("Invalid input")
+            
+    elif user_input == "status":
+        jack.status()
+        
+        
+    # TODO: future commands: "clue", "arrest", "status"
     else:
         print("Unknown command.")
 

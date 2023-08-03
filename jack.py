@@ -114,6 +114,24 @@ class Jack:
         else:
             print("Jack has ", 16 - len(self.path_used), " moves remaining.")
 
+    def clue_search(self, pos_list):
+        #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.
+        print("\nSearching for clues at: ", pos_list)
+        for loc in pos_list:
+            if loc in self.path_used:
+                print("Clue found at ", loc, "!!")
+                self.clues.append(loc)
+                break
+            else:
+                print(loc, ": no clue")
+
+    def arrest(self, pos):
+        #TODO: verify arrest location is next to an ipos?  Or just have players enforce the rules themselves.
+        if pos == self.pos:
+            print("Congratulations!  You arrested Jack at location ", pos, "!")
+        else:
+            print("Jack is not at location ", pos)
+
 '''
     def find_next_ilocation(self, vlist, id_list):
         index = 1

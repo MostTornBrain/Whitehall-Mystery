@@ -90,6 +90,33 @@ def parse_ipos(user_input):
                 break;
     return values;
 
+def parse_clues(user_input):
+    # Use regular expression to match the alphanumeric values
+    match = re.search(r'clues\s(.+)', user_input)
+    values = []
+    # Extract the alphanumeric values
+    if match:
+        values = match.group(1).split(',')
+        values = [value.strip() for value in values]
+        for value in values:
+            if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+                values = []
+                print(value, " is not a valid location.")
+                break;
+    return values;
+
+def parse_arrest(user_input):
+    # Use regular expression to match the alphanumeric values
+    match = re.search(r'arrest\s(.+)', user_input)
+    # Extract the alphanumeric values
+    if match:
+        value = match.group(1)
+        value.strip()
+        if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+            print(value, " is not a valid location.")
+            value = "BAD"
+    return value
+
 def process_input(user_input):
     if user_input == "jack":
         jack.move()
@@ -112,6 +139,16 @@ def process_input(user_input):
             
     elif user_input == "status":
         jack.status()
+        
+    elif "arrest" in user_input:
+        pos = parse_arrest(user_input)
+        if (pos != "BAD"):
+            jack.arrest(pos)
+        
+    elif "clues" in user_input:
+        pos_list = parse_clues(user_input)
+        if (len(pos_list) != 0):
+            jack.clue_search(pos_list)
         
         
     # TODO: future commands: "clue", "arrest", "status"

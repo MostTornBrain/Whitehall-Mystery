@@ -57,14 +57,33 @@ class Jack:
             index=index+1
         return self.graph.vp.ids[vlist[index]]
 
+    # Poison all the paths that go through an inspector as Jack isn't allowed to use those
     def poison(self, adjust):
         for num in range (0, 3):
             v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         
             for e in v.all_edges():
-                #print ("Adjusting: " + str(g.ep.weight[e]))
                 self.graph.ep.weight[e] += adjust
-                #print ("    New: " + str(g.ep.weight[e]))
+
+    # Discourage Jack from taking paths near inspectors by increasing the weights
+    # This couldbe written recursivesly to allow more easy fine-tuning of the radiating weights over a distance
+    # rather than being hardcoded to be only across a distance of 2
+    def discourage(self, adjust):
+        for num in range (0, 3):
+            # Find the vertex belonging to the `num` inspector
+            v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+            
+            # Add a weight to all the edges one vertex away from the inspector
+            for n in v.out_neighbors():
+                for e in n.all_edges():
+                    self.graph.ep.weight[e] += adjust
+                    
+                # Also weight to everything 2 vertices away, which will have a compounding effect 
+                # on the inbound edges leading toward the inspect since they were already adjusted above
+                for n1 in n.out_neighbors():
+                    for e1 in n1.all_edges():
+                        self.graph.ep.weight[e1] += adjust
+
 
     def status(self):
         print()
@@ -83,7 +102,11 @@ class Jack:
     
         # Poison the position of the inspectors (i.e. add weights)
         self.poison(1000)
-    
+        deterent = random.choice([0,1,1,1])
+        self.discourage(deterent)
+        
+        # TODO:  Need to detect when surrounded (i.e shortest path is > 1000) and 
+        # determine if any move is possible or if Jack is trapped and loses.
         vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         if (self.godmode):
             print([self.graph.vp.ids[v] for v in vlist])
@@ -93,11 +116,12 @@ class Jack:
         
         # un-poison the ipos edges
         self.poison(-1000)
+        self.discourage(-deterent)
         
+        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
+                                                            weights=self.graph.ep.weight)
         if self.godmode:
-            print("\nJack moves to -> " + self.pos + " and is " + 
-                str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
-                                                            weights=self.graph.ep.weight)) + " away.")
+            print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
         
         if self.pos == self.active_target:
             print("Jack has committed a crime at ", self.pos)
@@ -113,6 +137,8 @@ class Jack:
             print("    Crime locations: ", self.crimes)
         else:
             print("Jack has ", 16 - len(self.path_used), " moves remaining.")
+            if (16 - len(self.path_used) < shortest):
+                print("Jack LOSES!  He cannot reach his target with the number of moves left.")
 
     def clue_search(self, pos_list):
         #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.

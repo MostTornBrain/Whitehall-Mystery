@@ -15,17 +15,23 @@ for node in ug.vertices():
     
     if 'c' in ug.vp.ids[node]:
         vshape[node] = "square"
-        vsize[node] = 5
-        vfsize[node] = 5
+        vsize[node] = 8
+        vfsize[node] = 8
     else:
         vshape[node] = "circle"
         vsize[node] = 18
         vfsize[node] = 10
 
+# Color ispector starting positions yellow
+for node in starting_ipos:
+    # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
+    v = find_vertex(ug, ug.vp.ids, node)[0]
+    vcolor[v] = "#FFD700"
+
 # Color all the destinations in the four quadrants white
 for q in quads:
     for num in q:
-        v=find_vertex(ug, ug.vp.ids, num)[0]    
+        v = find_vertex(ug, ug.vp.ids, num)[0]    
         vcolor[v] = "#ffffff"
 
 # Make water destinations blue

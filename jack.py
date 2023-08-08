@@ -102,8 +102,8 @@ class Jack:
     
         # Poison the position of the inspectors (i.e. add weights)
         self.poison(1000)
-        deterent = random.choice([0,1,1,1])
-        self.discourage(deterent)
+        deterrent = random.choice([0,1,1,1])
+        self.discourage(deterrent)
         
         # TODO:  Need to detect when surrounded (i.e shortest path is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
@@ -116,7 +116,7 @@ class Jack:
         
         # un-poison the ipos edges
         self.poison(-1000)
-        self.discourage(-deterent)
+        self.discourage(-deterrent)
         
         shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
                                                             weights=self.graph.ep.weight)

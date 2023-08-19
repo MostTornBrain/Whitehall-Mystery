@@ -62,7 +62,7 @@ graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vs
 ##########################################
 
 ipos = ["87c1", "77c1", "86c1"]
-jack = Jack(ug, ipos, godmode=False);
+jack = Jack(ug, ipos);
 
 ##########################################
 
@@ -128,10 +128,10 @@ def process_input(user_input):
         jack.reset()
         
     elif user_input == "godmode on":
-        jack.set_godmode(True)
+        jack.godmode = True
         
     elif user_input == "godmode off":
-        jack.set_godmode(False)
+        jack.godmode = False
         
     elif "ipos" in user_input:
         values = parse_ipos(user_input)
@@ -168,8 +168,7 @@ def process_input(user_input):
         print("   arrest <pos>:                 Attempt arrest at the specified position")
         print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
         print("   exit:                         Completely exit the program.")
-        if (jack.godmode):
-            print("   jackpos <pos>:                Move Jack to the specified location for debugging")
+        jack.godmode_print("   jackpos <pos>:                Move Jack to the specified location for debugging")
     else:
         print("Unknown command.")
 

@@ -4,7 +4,6 @@ import random
 
 WATER = 1
 
-
 def reset_graph_color_and_shape(ug):
     # iterate over all the nodes
     for node in ug.vertices():
@@ -36,12 +35,11 @@ def reset_graph_color_and_shape(ug):
         v=find_vertex(ug, ug.vp.ids, num)[0]    
         ug.vp.vcolor[v] = "#0000FF"
 
-
 class Jack:
-    def __init__(self, g, ipos, godmode):
+    def __init__(self, g, ipos):
         self.graph = g
-        self.godmode = godmode
         self.ipos = ipos
+        self.godmode = False
         
         self.game_in_progress = False
         
@@ -60,6 +58,10 @@ class Jack:
         print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
         print("   Then type \033[1mstart\033[0m to begin the game.")
 
+    def godmode_print(self, *msg):
+        if (self.godmode):
+            print(*msg)
+
     def reset(self):
         self.game_in_progress = True
         self.targets = []
@@ -77,11 +79,11 @@ class Jack:
         for q in quads:
             self.targets.append(random.choice(q))
         
-        if (self.godmode):
-            print("Jack shall visit ", self.targets)
+        self.godmode_print("Jack shall visit ", self.targets)
         
         # Determine starting position and announce it
-        self.choose_random_target()
+        self.choose_starting_target()
+
         self.pos = self.active_target
         self.targets.remove(self.pos)
         self.crimes = [self.pos]
@@ -90,11 +92,13 @@ class Jack:
         
         self.completed_targets = [self.pos]
         
-        if (self.godmode):
-            print ("Jack starts at " + self.pos + " and is " + 
+        self.godmode_print("Jack starts at " + self.pos + " and is " + 
                 str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], 
                                       find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0], weights=self.graph.ep.weight)) + 
                 " away.")
+                
+        # Perform Jack's first move of the game
+        self.move()
 
 
     # Compute the travel cost for Jack to move from his current location 
@@ -116,7 +120,7 @@ class Jack:
         best_option = 0
         
         for option in self.targets:
-            d = self.hop_count(option)
+            d = self.hop_count(self.pos, option)
             if d < best_distance:
                 best_option = option
                 best_distance = d
@@ -125,18 +129,55 @@ class Jack:
             print("Woah! That's wrong!")
         
         self.active_target = best_option
-        if (self.godmode):
-            print("Best distance", best_distance)
-            print("Jack chooses ", self.active_target)
+        self.godmode_print("Best distance", best_distance)
+        self.godmode_print("Jack chooses ", self.active_target)
 
-    def choose_random_target(self):            
-        self.active_target = random.choice(self.targets)
-        if (self.godmode):
-            print("Jack chooses ", self.active_target)
+
+    def choose_starting_target(self):            
+        candidates = []
+        farthest_dist  = 0
+        farthest_mean = 0
         
-    def set_godmode(self, b):
-        self.godmode = b
+        # Built a list of targets that aren't aren't too close to the investigators
+        for target in self.targets:
+            closest_dist = 100
+            closest_mean = 0
+            
+            self.godmode_print("Considering target: ", target)
+            # Consider how close each investigator is
+            for pos in self.ipos:
+                dist = self.hop_count(target, pos)
+                closest_mean += dist
+                self.godmode_print("   ipos " + pos + " is " + str(dist) + " away.")
+                if dist < closest_dist:
+                    closest_dist = dist
 
+            closest_mean = closest_mean / 3
+            self.godmode_print("  Closest dist:", closest_dist)
+            self.godmode_print("  Closest mean:", closest_mean)
+            
+            # If farthest away so far, save it for choice of last resort.
+            # IF distances are equal, consider the average distance as a tie breaker
+            if (closest_dist > farthest_dist) or (closest_dist == farthest_dist and closest_mean > farthest_mean):
+                farthest_target = target
+                farthest_dist = closest_dist
+                farthest_mean = closest_mean
+            
+            # If Far enough away, add to the candidate list
+            if closest_dist > 3:
+                self.godmode_print("Adding " + target + " to the candidate list.")
+                candidates.append(target)
+        
+        # If we have targets that are not too close, pick one randomly
+        if len(candidates) > 0:
+            self.active_target = random.choice(candidates)
+        else:
+            self.godmode_print("All the targets are close to an investigator. Choosing the farthest of all 4...")
+            self.active_target = farthest_target
+                
+        self.godmode_print("Jack chooses ", self.active_target)
+        
+        
     def set_ipos(self, i):
         self.ipos = i
         print("ipos: ", self.ipos)
@@ -194,9 +235,8 @@ class Jack:
         print("Alley cards: ", 2 - len(self.alley_cards))
         print("Boat cards:  ", 2 - len(self.boat_cards))
         print("Moves remaining: ", 16 - self.turn_count())
-        if (self.godmode):
-            print("Here is the path Jack took:", self.path_used)
-            print("Targets: ", self.targets)
+        self.godmode_print("Here is the path Jack took:", self.path_used)
+        self.godmode_print("Targets: ", self.targets)
         print
         
 
@@ -207,13 +247,13 @@ class Jack:
     
     
     # Calculate the number of vertices away from the target - every vertex should have a weight of 1
-    def hop_count(self, dest):
+    def hop_count(self, src, dest):
         #unweight the water paths if Jack still has a boat card
         if (len(self.boat_cards) < 2):
             self.set_water_weight(1)
         
         v = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
-        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v, 
+        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, src)[0], v, 
                                                             weights=self.graph.ep.weight)
 
         #re-weight the water paths if Jack still has a boat card
@@ -229,8 +269,7 @@ class Jack:
         if (self.turn_count() > 7):
             if (enabled):
                 weight = 1
-                if (self.godmode):
-                    print("Jack is desperate")
+                self.godmode_print("Jack is desperate")
             else:
                 weight = 10
             
@@ -270,8 +309,7 @@ class Jack:
         v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
         
         vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-        if (self.godmode):
-            print([self.graph.vp.ids[v] for v in vlist])
+        self.godmode_print([self.graph.vp.ids[v] for v in vlist])
 
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
@@ -303,24 +341,22 @@ class Jack:
         self.path_used.append(self.pos)
 
         # Count how far away the goal is now that Jack moved
-        shortest = self.hop_count(self.active_target)
+        shortest = self.hop_count(self.pos, self.active_target)
         
         if (coach_move):
             print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)
-            if self.godmode:
-                print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
+            self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
             if (shortest > 1):
                 self.pos = self.find_second_location(vlist)
                 self.path_used.append(self.pos)
             else:
                 self.find_nearest_vertex(self.path_used[-2])
             # Count how far away the goal is now that Jack moved
-            shortest = self.hop_count(self.active_target)
+            shortest = self.hop_count(self.pos, self.active_target)
 
                 
-        if self.godmode:
-            print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
+        self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
 
         if self.pos == self.active_target:
             print("Jack has committed a crime at ", self.pos)
@@ -333,7 +369,7 @@ class Jack:
             print("Game over!  Jack won!")
             print("    Crime locations: ", self.crimes)
         else:
-            print("Jack has ", 16 - self.turn_count(), " moves remaining.")
+            print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")
 
             # If shortest path is longer than remaining turns
             if (16 - self.turn_count() < shortest):

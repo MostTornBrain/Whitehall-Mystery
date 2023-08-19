@@ -14,36 +14,6 @@ vsize = ug.new_vp("int")
 vfsize = ug.new_vp("int")
 ecolor = ug.new_edge_property("string")
 
-# iterate over all the nodes
-for node in ug.vertices():
-    vcolor[node] = "#000000"
-    
-    if 'c' in ug.vp.ids[node]:
-        vshape[node] = "square"
-        vsize[node] = 8
-        vfsize[node] = 8
-    else:
-        vshape[node] = "circle"
-        vsize[node] = 18
-        vfsize[node] = 10
-
-# Color ispector starting positions yellow
-for node in starting_ipos:
-    # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
-    v = find_vertex(ug, ug.vp.ids, node)[0]
-    vcolor[v] = "#FFD700"
-
-# Color all the destinations in the four quadrants white
-for q in quads:
-    for num in q:
-        v = find_vertex(ug, ug.vp.ids, num)[0]    
-        vcolor[v] = "#ffffff"
-
-# Make water destinations blue
-for num in water:
-    v=find_vertex(ug, ug.vp.ids, num)[0]    
-    vcolor[v] = "#0000FF"
-
 # Assign the x-y coordinates of everything
 vpos = ug.new_vp("vector<double>")
 for pair in positions:
@@ -70,6 +40,8 @@ ug.vp.vshape = vshape
 ug.vp.vsize = vsize
 ug.vp.vfsize = vfsize
 ug.ep.ecolor = ecolor
+
+reset_graph_color_and_shape(ug)
 
 # Save it so I can debug the contents to make sure I'm building it correctly
 ug.save("my_graph.graphml")
@@ -152,7 +124,7 @@ def process_input(user_input):
     if user_input == "jack":
         jack.move()
         
-    elif user_input == "reset":
+    elif user_input == "start":
         jack.reset()
         
     elif user_input == "godmode on":
@@ -189,14 +161,15 @@ def process_input(user_input):
     elif "help" in user_input:
         print("Commands are:")
         print("   jack:                         Jack takes his turn")
-        print("   reset:                        Restart the game")
+        print("   start:                        Start a new game (CAUTION: typing this mid-game will RESTART the game)")
         print("   godmode <on,off>:             Toggle godmode")
         print("   ipos <pos1>, <pos2>, <pos3>:  Enter the inspector locations")
         print("   status:                       View the current game status")
         print("   arrest <pos>:                 Attempt arrest at the specified position")
         print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
+        print("   exit:                         Completely exit the program.")
         if (jack.godmode):
-            print("   jackpos <pos>:       Move Jack to the specified location for debugging")
+            print("   jackpos <pos>:                Move Jack to the specified location for debugging")
     else:
         print("Unknown command.")
 

@@ -4,17 +4,68 @@ import random
 
 WATER = 1
 
+
+def reset_graph_color_and_shape(ug):
+    # iterate over all the nodes
+    for node in ug.vertices():
+        ug.vp.vcolor[node] = "#000000"
+    
+        if 'c' in ug.vp.ids[node]:
+            ug.vp.vshape[node] = "square"
+            ug.vp.vsize[node] = 8
+            ug.vp.vfsize[node] = 8
+        else:
+            ug.vp.vshape[node] = "circle"
+            ug.vp.vsize[node] = 18
+            ug.vp.vfsize[node] = 10
+
+    # Color ispector starting positions yellow
+    for node in starting_ipos:
+        # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
+        v = find_vertex(ug, ug.vp.ids, node)[0]
+        ug.vp.vcolor[v] = "#FFD700"
+
+    # Color all the destinations in the four quadrants white
+    for q in quads:
+        for num in q:
+            v = find_vertex(ug, ug.vp.ids, num)[0]    
+            ug.vp.vcolor[v] = "#ffffff"
+
+    # Make water destinations blue
+    for num in water:
+        v=find_vertex(ug, ug.vp.ids, num)[0]    
+        ug.vp.vcolor[v] = "#0000FF"
+
+
 class Jack:
     def __init__(self, g, ipos, godmode):
         self.graph = g
         self.godmode = godmode
         self.ipos = ipos
-        self.reset()
-
-    def reset(self):
+        
+        self.game_in_progress = False
+        
         self.targets = []
         self.crimes = []
         self.clues = []
+        
+        self.boat_cards = []
+        self.alley_cards = []
+        self.coach_cards = []
+        
+        self.path_used = []
+        
+        print("   Welcome!")
+        print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
+        print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
+        print("   Then type \033[1mstart\033[0m to begin the game.")
+
+    def reset(self):
+        self.game_in_progress = True
+        self.targets = []
+        self.crimes = []
+        self.clues = []
+        reset_graph_color_and_shape(self.graph)
         
         # Jack gets two of each - track use by length of the array as the array will hold the turn the card was used.
         self.boat_cards = []
@@ -40,8 +91,10 @@ class Jack:
         self.completed_targets = [self.pos]
         
         if (self.godmode):
-            print ("Jack starts at " + self.pos + " and is " + str(shortest_distance(g, find_vertex(g, g.vp.ids, self.pos)[0], 
-                find_vertex(g, g.vp.ids, self.active_target)[0], weights=g.ep.weight)) + " away.")
+            print ("Jack starts at " + self.pos + " and is " + 
+                str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], 
+                                      find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0], weights=self.graph.ep.weight)) + 
+                " away.")
 
 
     # Compute the travel cost for Jack to move from his current location 
@@ -63,7 +116,7 @@ class Jack:
         best_option = 0
         
         for option in self.targets:
-            d = self.distance(option)
+            d = self.hop_count(option)
             if d < best_distance:
                 best_option = option
                 best_distance = d
@@ -197,7 +250,14 @@ class Jack:
     
 
     def move(self):
+        if (not self.game_in_progress):
+            print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
+            return
+        
         coach_move = False
+
+        # Always consider what is the best target to try - do this before poisoning/weighting routes
+        self.choose_closest_target()
         
         # Poison the position of the inspectors (i.e. add weights)
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
@@ -205,9 +265,6 @@ class Jack:
         deterrent = random.choice([0,1,1,1])
         self.discourage(deterrent)
         self.consider_desperate_weights(True)
-
-        # Always consider what is the best target to try
-        self.choose_closest_target()
         
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]

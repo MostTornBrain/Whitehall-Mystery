@@ -2,12 +2,17 @@ from graph_tool.all import *
 from jack import *
 import re
 
+LAND = 0
+WATER = 1
+ALLEY = 2
+
 ug = Graph(edge_list, hashed=True, eprops=[("weight", "int"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
 vshape = ug.new_vp("string")
 vsize = ug.new_vp("int")
 vfsize = ug.new_vp("int")
+ecolor = ug.new_edge_property("string")
 
 # iterate over all the nodes
 for node in ug.vertices():
@@ -51,25 +56,33 @@ for node in ug.vertices():
     if not (vpos[node]):
         print("        [\"%s\", [,-]]," % ug.vp.ids[node])
 
+# We don't want the water or alley paths (edges) to be visible
+for edge in ug.edges():
+    if ug.ep.transport[edge] == WATER:
+        ecolor[edge] = "#ffffff"
+    else:
+        ecolor[edge] = "#000000"
+
 # Make these properties part internal to the graph so they get saved if we save the graph to a file
 ug.vp.pos = vpos
 ug.vp.vcolor = vcolor
 ug.vp.vshape = vshape
 ug.vp.vsize = vsize
 ug.vp.vfsize = vfsize
+ug.ep.ecolor = ecolor
 
 # Save it so I can debug the contents to make sure I'm building it correctly
 ug.save("my_graph.graphml")
 
-ug.list_properties()
+# ug.list_properties()
 
 # We don't want curved edges - define a common Bezier control so the lines are straight.
 # This will make the two edges overlap and look like a single edge with an arrow on each end.
 control = [0.3, 0, 0.7, 0]
-
+    
 graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vshape, vertex_size=vsize,
               vertex_font_size=vfsize,
-              pos=vpos, output_size=(873,873), edge_pen_width=1,
+              pos=vpos, output_size=(873,873), edge_pen_width=1, edge_color=ecolor,
               edge_marker_size=4,
               edge_control_points=control,
               output="graph-draw.pdf")
@@ -123,6 +136,18 @@ def parse_arrest(user_input):
             value = "BAD"
     return value
 
+def parse_jackpos(user_input):
+    # Use regular expression to match the alphanumeric values
+    match = re.search(r'jackpos\s(.+)', user_input)
+    # Extract the alphanumeric values
+    if match:
+        value = match.group(1)
+        value.strip()
+        if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+            print(value, " is not a valid location.")
+            value = "BAD"
+    return value
+
 def process_input(user_input):
     if user_input == "jack":
         jack.move()
@@ -156,8 +181,22 @@ def process_input(user_input):
         if (len(pos_list) != 0):
             jack.clue_search(pos_list)
         
-        
-    # TODO: future commands: "clue", "arrest", "status"
+    elif jack.godmode and "jackpos" in user_input:
+        pos = parse_jackpos(user_input)
+        if (pos != "BAD"):
+            jack.pos = pos
+            
+    elif "help" in user_input:
+        print("Commands are:")
+        print("   jack:                         Jack takes his turn")
+        print("   reset:                        Restart the game")
+        print("   godmode <on,off>:             Toggle godmode")
+        print("   ipos <pos1>, <pos2>, <pos3>:  Enter the inspector locations")
+        print("   status:                       View the current game status")
+        print("   arrest <pos>:                 Attempt arrest at the specified position")
+        print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
+        if (jack.godmode):
+            print("   jackpos <pos>:       Move Jack to the specified location for debugging")
     else:
         print("Unknown command.")
 

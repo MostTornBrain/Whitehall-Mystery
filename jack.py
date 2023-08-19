@@ -2,6 +2,8 @@ from graph_tool.all import *
 from graph_data import *
 import random
 
+WATER = 1
+
 class Jack:
     def __init__(self, g, ipos, godmode):
         self.graph = g
@@ -14,32 +16,67 @@ class Jack:
         self.crimes = []
         self.clues = []
         
+        # Jack gets two of each - track use by length of the array as the array will hold the turn the card was used.
+        self.boat_cards = []
+        self.alley_cards = []
+        self.coach_cards = []
+        
+        self.set_water_weight(10)
+        
         for q in quads:
             self.targets.append(random.choice(q))
-        # TODO: For now, only use two quads since the whole map has been entered
-        del self.targets[3];
-        del self.targets[2];
+        
         if (self.godmode):
             print("Jack shall visit ", self.targets)
         
         # Determine starting position and announce it
-        self.choose_closest_target()
+        self.choose_random_target()
         self.pos = self.active_target
         self.targets.remove(self.pos)
         self.crimes = [self.pos]
         self.path_used = [self.pos]
         print("Jack commits a crime at ", self.pos)
         
-        self.choose_closest_target()
         self.completed_targets = [self.pos]
         
         if (self.godmode):
             print ("Jack starts at " + self.pos + " and is " + str(shortest_distance(g, find_vertex(g, g.vp.ids, self.pos)[0], 
                 find_vertex(g, g.vp.ids, self.active_target)[0], weights=g.ep.weight)) + " away.")
+
+
+    # Compute the travel cost for Jack to move from his current location 
+    # to the supplied target.  This cost is weighted, not just a counting of vertices.
+    def distance(self, target):
+        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        v2 = find_vertex(self.graph, self.graph.vp.ids, target)[0]
+            
+        vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         
+        distance = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
+                                                                    weights=self.graph.ep.weight)
+        return distance
+
+
+    # choose the optimal target based on current location and investigator positions
     def choose_closest_target(self):
-        # TODO: choose the optimal target based on current location and investigator positions
-        # For now it is random
+        best_distance = 10000000
+        best_option = 0
+        
+        for option in self.targets:
+            d = self.distance(option)
+            if d < best_distance:
+                best_option = option
+                best_distance = d
+                
+        if best_option == 0:
+            print("Woah! That's wrong!")
+        
+        self.active_target = best_option
+        if (self.godmode):
+            print("Best distance", best_distance)
+            print("Jack chooses ", self.active_target)
+
+    def choose_random_target(self):            
         self.active_target = random.choice(self.targets)
         if (self.godmode):
             print("Jack chooses ", self.active_target)
@@ -57,7 +94,17 @@ class Jack:
             index=index+1
         return self.graph.vp.ids[vlist[index]]
 
-    # Poison all the paths that go through an inspector as Jack isn't allowed to use those
+    # Find the second vertex in the vlist
+    def find_second_location(self, vlist):
+        index = 1
+        while 'c' in self.graph.vp.ids[vlist[index]]:
+            index=index+1
+        index = index+1   # Skip over the first vertex
+        while 'c' in self.graph.vp.ids[vlist[index]]:
+            index=index+1        
+        return self.graph.vp.ids[vlist[index]]
+
+    # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
     def poison(self, adjust):
         for num in range (0, 3):
             v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
@@ -90,55 +137,152 @@ class Jack:
         print("Crimes: ", self.crimes)
         print("Clues: ", self.clues)
         print("ipos: ", self.ipos)
-        print("Moves remaining: ", 16 - len(self.path_used))
+        print("Coach cards: ", 2 - len(self.coach_cards))
+        print("Alley cards: ", 2 - len(self.alley_cards))
+        print("Boat cards:  ", 2 - len(self.boat_cards))
+        print("Moves remaining: ", 16 - self.turn_count())
+        if (self.godmode):
+            print("Here is the path Jack took:", self.path_used)
+            print("Targets: ", self.targets)
         print
         
+
+    def set_water_weight(self, weight):
+        for edge in self.graph.edges():
+            if self.graph.ep.transport[edge] == WATER:
+                self.graph.ep.weight[edge] = weight
+    
+    
+    # Calculate the number of vertices away from the target - every vertex should have a weight of 1
+    def hop_count(self, dest):
+        #unweight the water paths if Jack still has a boat card
+        if (len(self.boat_cards) < 2):
+            self.set_water_weight(1)
+        
+        v = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
+        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v, 
+                                                            weights=self.graph.ep.weight)
+
+        #re-weight the water paths if Jack still has a boat card
+        if (len(self.boat_cards) < 2):
+            self.set_water_weight(10)
+        
+        return shortest
+        
+    
+    # If Jack is running out of moves, reduce the weights of water if he has boat cards
+    def consider_desperate_weights(self, enabled):
+        # TODO: consider alley weights
+        if (self.turn_count() > 7):
+            if (enabled):
+                weight = 1
+                if (self.godmode):
+                    print("Jack is desperate")
+            else:
+                weight = 10
+            
+            if (len(self.boat_cards) < 2):
+                self.set_water_weight(weight)
+
+    def turn_count(self):
+        return len(self.path_used)
+        
+
+    def find_nearest_vertex(self, prior_location):
+        # Jack is not allowed to move to a target destination using a coach
+        # Need to figure out how to pick another vertex that is 1 space away and isn't where he was previously
+        print("Sorry, I have not yet implemented this type of move for Jack.")
+        print("Jack was surrounded by investigators and tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly there.")
+        print("Jack was at location " + prior_location + " and is currently at " + self.pos)
+    
+
     def move(self):
-        # Always consider what is the best target to try
-        self.choose_closest_target()
-    
-        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
-    
+        coach_move = False
+        
         # Poison the position of the inspectors (i.e. add weights)
+        # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
         self.poison(1000)
         deterrent = random.choice([0,1,1,1])
         self.discourage(deterrent)
+        self.consider_desperate_weights(True)
+
+        # Always consider what is the best target to try
+        self.choose_closest_target()
         
-        # TODO:  Need to detect when surrounded (i.e shortest path is > 1000) and 
-        # determine if any move is possible or if Jack is trapped and loses.
+        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+        
         vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         if (self.godmode):
             print([self.graph.vp.ids[v] for v in vlist])
-    
-        self.pos = self.find_next_location(vlist)
-        self.path_used.append(self.pos)
-        
+
+        # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
+        # determine if any move is possible or if Jack is trapped and loses.
+        if shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], vlist[1], 
+                                                            weights=self.graph.ep.weight) >= 1000:
+            if (len(self.coach_cards) < 2 and self.turn_count() < 13):
+                # do coach move
+                coach_move = True
+            # TODO: consider alleys
+            else:
+                print("Jack cannot move.  You win!")
+                print("Jack's current position: ", self.pos)
+                return
+
         # un-poison the ipos edges
         self.poison(-1000)
         self.discourage(-deterrent)
+        self.consider_desperate_weights(False)
+              
+        # If a water path was selected, spend the card
+        if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
+            print("Jack took a boat on turn %d!" % len(self.path_used))
+            self.boat_cards.append(self.turn_count())
+            if (len(self.boat_cards)>= 2):
+                # poison all the water paths - Jack has no boat cards left
+                self.set_water_weight(1000)
         
-        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
-                                                            weights=self.graph.ep.weight)
+        self.pos = self.find_next_location(vlist)
+        self.path_used.append(self.pos)
+
+        # Count how far away the goal is now that Jack moved
+        shortest = self.hop_count(self.active_target)
+        
+        if (coach_move):
+            print("Jack takes a coach!")
+            self.coach_cards.append(self.turn_count()-1)
+            if self.godmode:
+                print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
+            if (shortest > 1):
+                self.pos = self.find_second_location(vlist)
+                self.path_used.append(self.pos)
+            else:
+                self.find_nearest_vertex(self.path_used[-2])
+            # Count how far away the goal is now that Jack moved
+            shortest = self.hop_count(self.active_target)
+
+                
         if self.godmode:
             print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
-        
+
         if self.pos == self.active_target:
             print("Jack has committed a crime at ", self.pos)
             print("Here is the path he took:", self.path_used)
             self.crimes.append(self.pos)
             self.path_used = [self.pos]
             self.targets.remove(self.pos)
-            if len(self.targets) > 0:
-                self.choose_closest_target()
 
         if (len(self.targets) == 0):
             print("Game over!  Jack won!")
             print("    Crime locations: ", self.crimes)
         else:
-            print("Jack has ", 16 - len(self.path_used), " moves remaining.")
-            if (16 - len(self.path_used) < shortest):
+            print("Jack has ", 16 - self.turn_count(), " moves remaining.")
+
+            # If shortest path is longer than remaining turns
+            if (16 - self.turn_count() < shortest):
                 print("Jack LOSES!  He cannot reach his target with the number of moves left.")
+                print("Here is the path he took:", self.path_used)
+                return
 
     def clue_search(self, pos_list):
         #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.
@@ -155,6 +299,7 @@ class Jack:
         #TODO: verify arrest location is next to an ipos?  Or just have players enforce the rules themselves.
         if pos == self.pos:
             print("Congratulations!  You arrested Jack at location ", pos, "!")
+            print("Here is the path he took:", self.path_used)
         else:
             print("Jack is not at location ", pos)
 

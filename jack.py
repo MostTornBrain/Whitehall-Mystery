@@ -70,7 +70,7 @@ class Jack:
         # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
         reset_graph_color_and_shape(self.graph)
     
-        for target in self.completed_targets:    
+        for target in self.crimes:    
             self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
     
         for clue in self.clues:
@@ -105,6 +105,7 @@ class Jack:
         self.targets = []
         self.crimes = []
         self.clues = []
+        self.path_used = []
         reset_graph_color_and_shape(self.graph)
         
         # Jack gets two of each - track use by length of the array as the array will hold the turn the card was used.
@@ -119,16 +120,9 @@ class Jack:
         
         self.godmode_print("Jack shall visit ", self.targets)
         
-        # Determine starting position and announce it
+        # Determine starting position.  It will be and announced as part of Jack's first move
         self.choose_starting_target()
-
         self.pos = self.active_target
-        self.targets.remove(self.pos)
-        self.crimes = [self.pos]
-        self.path_used = [self.pos]
-        print("Jack commits a crime at ", self.pos)
-        
-        self.completed_targets = [self.pos]
         
         self.godmode_print("Jack starts at " + self.pos + " and is " + 
                 str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], 
@@ -333,7 +327,10 @@ class Jack:
                 dist = self.hop_count(self.pos, ipos)
                 if dist < closest:
                     closest = dist
-            if closest < 2:
+            # If the crossing is less than a vertex hop away, it is "too close"
+            # Perhaps later use a different hop_count() method that solely counts edges? The shortes_tpath() graph_tool function without weights should work.
+            # But this can be better since it won't be obvious to the investigators if they were really adjacent or not.
+            if closest < 1:
                 ret = COACH_MOVE
         return ret
 
@@ -342,6 +339,24 @@ class Jack:
             print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
             return
         
+        # Per the rules, Jack does not announce he has reached his target until AFTER the investigators take their turn.
+        # For this reason, we perform this check here before his next move.
+        if self.pos == self.active_target:
+            print("A crime has been discovered at \033[1m" + self.pos + "\033[0m and Jack has moved on.")
+            if (len(self.path_used) > 0):
+                # TODO: this isn't really part of the rules, but might be helpful during play
+                print("Here is the path he took:", self.path_used)
+            self.crimes.append(self.pos)
+            self.path_used = [self.pos]
+            self.targets.remove(self.pos)
+
+        if (len(self.targets) == 0):
+            print("Game over!  Jack won!")
+            print("    Crime locations: ", self.crimes)
+            self.make_pdf()
+            self.game_in_progress = False
+            return
+            
         move_type = NORMAL_MOVE
 
         # Always consider what is the best target to try - do this before poisoning/weighting routes
@@ -412,24 +427,13 @@ class Jack:
                 
         self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
 
-        if self.pos == self.active_target:
-            print("Jack has committed a crime at ", self.pos)
+        print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")
+
+        # If shortest path is longer than remaining turns
+        if (16 - self.turn_count() < shortest):
+            print("Jack LOSES!  He cannot reach his target with the number of moves left.")
             print("Here is the path he took:", self.path_used)
-            self.crimes.append(self.pos)
-            self.path_used = [self.pos]
-            self.targets.remove(self.pos)
-
-        if (len(self.targets) == 0):
-            print("Game over!  Jack won!")
-            print("    Crime locations: ", self.crimes)
-        else:
-            print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")
-
-            # If shortest path is longer than remaining turns
-            if (16 - self.turn_count() < shortest):
-                print("Jack LOSES!  He cannot reach his target with the number of moves left.")
-                print("Here is the path he took:", self.path_used)
-                return
+            return
         self.make_pdf()
 
     def clue_search(self, pos_list):

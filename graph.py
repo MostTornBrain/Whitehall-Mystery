@@ -133,6 +133,9 @@ def process_input(user_input):
             
     elif user_input == "status":
         jack.status()
+
+    elif user_input == "pdf":
+        jack.make_pdf()
         
     elif "arrest" in user_input:
         pos = parse_arrest(user_input)
@@ -158,6 +161,7 @@ def process_input(user_input):
         print("   status:                       View the current game status")
         print("   arrest <pos>:                 Attempt arrest at the specified position")
         print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
+        print("   pdf:                          Force the PDF file to be updated immediately with the current game state")
         print("   exit:                         Completely exit the program.")
         jack.godmode_print("   jackpos <pos>:                Move Jack to the specified location for debugging")
     else:

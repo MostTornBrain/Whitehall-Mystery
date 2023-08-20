@@ -324,13 +324,14 @@ class Jack:
         if len(self.coach_cards) < 2:
             closest = 100
             for ipos in self.ipos:
-                dist = self.hop_count(self.pos, ipos)
+                v = find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
+                dist = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
+                print("ipos " + ipos + " is " + str(dist) + " away.")
                 if dist < closest:
                     closest = dist
             # If the crossing is less than a vertex hop away, it is "too close"
-            # Perhaps later use a different hop_count() method that solely counts edges? The shortes_tpath() graph_tool function without weights should work.
-            # But this can be better since it won't be obvious to the investigators if they were really adjacent or not.
-            if closest < 1:
+            # TODO - add some random variability to the threshold?
+            if closest < 2:
                 ret = COACH_MOVE
         return ret
 

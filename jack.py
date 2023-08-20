@@ -349,6 +349,7 @@ class Jack:
             self.crimes.append(self.pos)
             self.path_used = [self.pos]
             self.targets.remove(self.pos)
+            self.clues = []
 
         if (len(self.targets) == 0):
             print("Game over!  Jack won!")
@@ -452,6 +453,7 @@ class Jack:
         if pos == self.pos:
             print("Congratulations!  You arrested Jack at location ", pos, "!")
             print("Here is the path he took:", self.path_used)
+            self.game_in_progress = False
         else:
             print("Jack is not at location ", pos)
 

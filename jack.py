@@ -323,6 +323,8 @@ class Jack:
         if len(self.coach_cards) < 2:
             closest = 100
             average = 0
+            
+            # Find how far away each investigator is from Jack - don't use weights - we want to count edges
             for ipos in self.ipos:
                 v = find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
                 dist = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
@@ -412,9 +414,12 @@ class Jack:
                 # poison all the water paths - Jack has no boat cards left
                 self.set_water_weight(1000)
         
-        # Determine if we are in danger and should move twice via a coach
+        # Have you consider the advantages to taking a COACH?
         if (move_type == NORMAL_MOVE):
-            move_type = self.consider_coach_move()
+            # If we are one space away from the goal, don't use a coach, otherwise, think about it.
+            if (self.hop_count(self.pos, self.active_target) != 1):
+                move_type = self.consider_coach_move()
+                
         
         if (move_type == COACH_MOVE):
             # recompute shortest path without any poisoned paths since Jack can move through investigators using a coach

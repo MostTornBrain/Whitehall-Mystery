@@ -8,6 +8,7 @@ NORMAL_MOVE = 0
 BOAT_MOVE = 1
 COACH_MOVE = 2
 ALLEY_MOVE = 3
+DEFAULT_WATER_WEIGHT = 10
 
 def reset_graph_color_and_shape(ug):
     # iterate over all the nodes
@@ -113,7 +114,7 @@ class Jack:
         self.alley_cards = []
         self.coach_cards = []
         
-        self.set_water_weight(10)
+        self.set_water_weight(DEFAULT_WATER_WEIGHT)
         
         for q in quads:
             self.targets.append(random.choice(q))
@@ -125,8 +126,7 @@ class Jack:
         self.pos = self.active_target
         
         self.godmode_print("Jack starts at " + self.pos + " and is " + 
-                str(shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], 
-                                      find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0], weights=self.graph.ep.weight)) + 
+                str(self.distance(self.active_target)) + 
                 " away.")
                 
         # Perform Jack's first move of the game
@@ -139,10 +139,7 @@ class Jack:
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         v2 = find_vertex(self.graph, self.graph.vp.ids, target)[0]
             
-        vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-        
-        distance = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v2, 
-                                                                    weights=self.graph.ep.weight)
+        distance = shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
         return distance
 
 
@@ -290,20 +287,22 @@ class Jack:
 
         #re-weight the water paths if Jack still has a boat card
         if (len(self.boat_cards) < 2):
-            self.set_water_weight(10)
+            self.set_water_weight(DEFAULT_WATER_WEIGHT)
         
         return shortest
         
     
-    # If Jack is running out of moves, reduce the weights of water if he has boat cards
+    # If Jack is running out of moves,
+    # or he is trying to reach the final target, 
+    # then reduce the weights of water if he still has boat cards
     def consider_desperate_weights(self, enabled):
         # TODO: consider alley weights
-        if (self.turn_count() > 7):
+        if (self.turn_count() > 7) or (len(self.targets) == 1):
             if (enabled):
                 weight = 1
                 self.godmode_print("Jack is desperate")
             else:
-                weight = 10
+                weight = DEFAULT_WATER_WEIGHT
             
             if (len(self.boat_cards) < 2):
                 self.set_water_weight(weight)
@@ -323,15 +322,24 @@ class Jack:
         ret = NORMAL_MOVE
         if len(self.coach_cards) < 2:
             closest = 100
+            average = 0
             for ipos in self.ipos:
                 v = find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
                 dist = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
-                print("ipos " + ipos + " is " + str(dist) + " away.")
+                self.godmode_print("ipos " + ipos + " is " + str(dist) + " away.")
+                average += dist
                 if dist < closest:
                     closest = dist
-            # If the crossing is less than a vertex hop away, it is "too close"
-            # TODO - add some random variability to the threshold?
-            if closest < 2:
+            average = average / 3
+            self.godmode_print("Average = ", average)
+            
+            # If the investigator crossing is adjacent to Jack, or all the investigators on average are close, 
+            # or Jack is searching for the final target on his list and the investigators are somewhat close,
+            # it is "too close", so Jack should use a coach card.
+            # TODO - add some random variability to the threshold?  
+            #        or maybe if the number of clues found is over X _and_ the average is < Y
+            #        or maybe if the running average is < X over Y turns?
+            if (closest < 2 or average < 2.5) or (len(self.targets) == 1 and average < 4):
                 ret = COACH_MOVE
         return ret
 
@@ -374,7 +382,7 @@ class Jack:
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
         
-        vlist, elist = shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+        vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         self.godmode_print([self.graph.vp.ids[v] for v in vlist])
 
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
@@ -407,13 +415,24 @@ class Jack:
         # Determine if we are in danger and should move twice via a coach
         if (move_type == NORMAL_MOVE):
             move_type = self.consider_coach_move()
-            
+        
+        if (move_type == COACH_MOVE):
+            # recompute shortest path without any poisoned paths since Jack can move through investigators using a coach
+            # but... Jack cannot take a boat at the same time, so poison the water routes
+            self.set_water_weight(1000)
+            vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+            self.set_water_weight(DEFAULT_WATER_WEIGHT)
+            self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
+            self.godmode_print([self.graph.vp.ids[v] for v in vlist])
+        
         self.pos = self.find_next_location(vlist)
         self.path_used.append(self.pos)
 
         # Count how far away the goal is now that Jack moved
         shortest = self.hop_count(self.pos, self.active_target)
         
+        # If Jack is doing a coach move, he moves a second time.
+        # Since we aready computed the shortest path above, just go to the next location in that path.
         if (move_type == COACH_MOVE):
             print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)

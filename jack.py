@@ -4,6 +4,11 @@ import random
 
 WATER = 1
 
+NORMAL_MOVE = 0
+BOAT_MOVE = 1
+COACH_MOVE = 2
+ALLEY_MOVE = 3
+
 def reset_graph_color_and_shape(ug):
     # iterate over all the nodes
     for node in ug.vertices():
@@ -44,9 +49,11 @@ class Jack:
         self.game_in_progress = False
         
         self.targets = []
+        self.completed_targets = []
         self.crimes = []
         self.clues = []
         
+        # For bookkeeping these get populated with the turn number they are used
         self.boat_cards = []
         self.alley_cards = []
         self.coach_cards = []
@@ -57,6 +64,37 @@ class Jack:
         print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
         print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
         print("   Then type \033[1mstart\033[0m to begin the game.")
+
+
+    def make_pdf(self):
+        # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
+        reset_graph_color_and_shape(self.graph)
+    
+        for target in self.completed_targets:    
+            self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
+    
+        for clue in self.clues:
+            self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = "yellow"
+        
+        for pos in self.ipos:
+            self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "triangle"
+        
+        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = "yellow"
+        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = "blue"
+        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = "red"
+    
+        # We don't want curved edges - define a common Bezier control so the lines are straight.
+        # This will make the two edges overlap and look like a single edge with an arrow on each end.
+        control = [0.3, 0, 0.7, 0]
+    
+        graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
+                      vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
+                      vertex_font_size=self.graph.vp.vfsize,
+                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
+                      edge_marker_size=4,
+                      edge_control_points=control,
+                      output="graph-draw.pdf")
+
 
     def godmode_print(self, *msg):
         if (self.godmode):
@@ -280,20 +318,31 @@ class Jack:
         return len(self.path_used)
         
 
-    def find_nearest_vertex(self, prior_location):
+    def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach
         # Need to figure out how to pick another vertex that is 1 space away and isn't where he was previously
         print("Sorry, I have not yet implemented this type of move for Jack.")
         print("Jack was surrounded by investigators and tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly there.")
         print("Jack was at location " + prior_location + " and is currently at " + self.pos)
     
+    def consider_coach_move(self):
+        ret = NORMAL_MOVE
+        if len(self.coach_cards) < 2:
+            closest = 100
+            for ipos in self.ipos:
+                dist = self.hop_count(self.pos, ipos)
+                if dist < closest:
+                    closest = dist
+            if closest < 2:
+                ret = COACH_MOVE
+        return ret
 
     def move(self):
         if (not self.game_in_progress):
             print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
             return
         
-        coach_move = False
+        move_type = NORMAL_MOVE
 
         # Always consider what is the best target to try - do this before poisoning/weighting routes
         self.choose_closest_target()
@@ -317,7 +366,7 @@ class Jack:
                                                             weights=self.graph.ep.weight) >= 1000:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
                 # do coach move
-                coach_move = True
+                move_type = COACH_MOVE
             # TODO: consider alleys
             else:
                 print("Jack cannot move.  You win!")
@@ -328,22 +377,27 @@ class Jack:
         self.poison(-1000)
         self.discourage(-deterrent)
         self.consider_desperate_weights(False)
-              
-        # If a water path was selected, spend the card
+                      
+        # If a water path was selected, spend the card - NOTE: this should never happen if a coach move was selected above so we do not check for move_type being set to COACH_MOVE
         if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
             print("Jack took a boat on turn %d!" % len(self.path_used))
             self.boat_cards.append(self.turn_count())
+            move_type = BOAT_MOVE
             if (len(self.boat_cards)>= 2):
                 # poison all the water paths - Jack has no boat cards left
                 self.set_water_weight(1000)
         
+        # Determine if we are in danger and should move twice via a coach
+        if (move_type == NORMAL_MOVE):
+            move_type = self.consider_coach_move()
+            
         self.pos = self.find_next_location(vlist)
         self.path_used.append(self.pos)
 
         # Count how far away the goal is now that Jack moved
         shortest = self.hop_count(self.pos, self.active_target)
         
-        if (coach_move):
+        if (move_type == COACH_MOVE):
             print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)
             self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
@@ -351,7 +405,7 @@ class Jack:
                 self.pos = self.find_second_location(vlist)
                 self.path_used.append(self.pos)
             else:
-                self.find_nearest_vertex(self.path_used[-2])
+                self.find_adjacent_nongoal_vertex(self.path_used[-2])
             # Count how far away the goal is now that Jack moved
             shortest = self.hop_count(self.pos, self.active_target)
 
@@ -376,6 +430,7 @@ class Jack:
                 print("Jack LOSES!  He cannot reach his target with the number of moves left.")
                 print("Here is the path he took:", self.path_used)
                 return
+        self.make_pdf()
 
     def clue_search(self, pos_list):
         #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.

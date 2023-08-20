@@ -48,21 +48,12 @@ ug.save("my_graph.graphml")
 
 # ug.list_properties()
 
-# We don't want curved edges - define a common Bezier control so the lines are straight.
-# This will make the two edges overlap and look like a single edge with an arrow on each end.
-control = [0.3, 0, 0.7, 0]
-    
-graph_draw(ug,  vertex_text=ug.vp.ids, vertex_fill_color=vcolor, vertex_shape=vshape, vertex_size=vsize,
-              vertex_font_size=vfsize,
-              pos=vpos, output_size=(873,873), edge_pen_width=1, edge_color=ecolor,
-              edge_marker_size=4,
-              edge_control_points=control,
-              output="graph-draw.pdf")
-
 ##########################################
 
 ipos = ["87c1", "77c1", "86c1"]
 jack = Jack(ug, ipos);
+
+jack.make_pdf()
 
 ##########################################
 

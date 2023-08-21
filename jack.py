@@ -70,7 +70,15 @@ class Jack:
     def make_pdf(self):
         # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
         reset_graph_color_and_shape(self.graph)
-    
+        
+        if (self.godmode):
+            # show Jack on the map
+            for loc in self.path_used:
+                self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = "cyan"
+            if hasattr(self, 'pos'):
+                self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "cyan"
+                self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "double_circle"
+        
         for target in self.crimes:    
             self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
     
@@ -78,12 +86,12 @@ class Jack:
             self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = "yellow"
         
         for pos in self.ipos:
-            self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "triangle"
+            self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
         
         self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = "yellow"
         self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = "blue"
         self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = "red"
-    
+                
         # We don't want curved edges - define a common Bezier control so the lines are straight.
         # This will make the two edges overlap and look like a single edge with an arrow on each end.
         control = [0.3, 0, 0.7, 0]
@@ -210,6 +218,7 @@ class Jack:
     def set_ipos(self, i):
         self.ipos = i
         print("ipos: ", self.ipos)
+        self.make_pdf()
 
     def find_next_location(self, vlist):
         index = 1
@@ -469,6 +478,7 @@ class Jack:
             if loc in self.path_used:
                 print("Clue found at ", loc, "!!")
                 self.clues.append(loc)
+                self.make_pdf()
                 break
             else:
                 print(loc, ": no clue")

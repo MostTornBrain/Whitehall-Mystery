@@ -169,7 +169,10 @@ def process_input(user_input):
 
 # Input loop
 while True:
-    user_input = input("> ")
+    if (jack.godmode):
+        user_input = input("godmode > ")
+    else:
+        user_input = input("> ")
     
     if user_input == "exit":
         print("Goodbye!")

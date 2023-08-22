@@ -99,7 +99,7 @@ class Jack:
         graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
                       vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
                       vertex_font_size=self.graph.vp.vfsize,
-                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=self.graph.ep.weight, edge_color=self.graph.ep.ecolor,
+                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
                       edge_marker_size=4,
                       edge_control_points=control,
                       output="graph-draw.pdf")

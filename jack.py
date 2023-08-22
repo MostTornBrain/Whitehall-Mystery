@@ -99,7 +99,7 @@ class Jack:
         graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
                       vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
                       vertex_font_size=self.graph.vp.vfsize,
-                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
+                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=self.graph.ep.weight, edge_color=self.graph.ep.ecolor,
                       edge_marker_size=4,
                       edge_control_points=control,
                       output="graph-draw.pdf")
@@ -134,22 +134,28 @@ class Jack:
         self.pos = self.active_target
         
         self.godmode_print("Jack starts at " + self.pos + " and is " + 
-                str(self.distance(self.active_target)) + 
+                str(self.hop_count(self.pos, self.active_target)) + 
                 " away.")
                 
         # Perform Jack's first move of the game
         self.move()
 
+    
+    # Calculate the number of vertices away from the target - every vertex should have a weight of 1
+    def hop_count(self, src, dest):
+        #unweight the water paths if Jack still has a boat card
+        if (len(self.boat_cards) < 2):
+            self.set_water_weight(1)
+        
+        v1 = find_vertex(self.graph, self.graph.vp.ids, src)[0]
+        v2 = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
+        shortest = shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
 
-    # Compute the travel cost for Jack to move from his current location 
-    # to the supplied target.  This cost is weighted, not just a counting of vertices.
-    def distance(self, target):
-        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, target)[0]
-            
-        distance = shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
-        return distance
-
+        #re-weight the water paths if Jack still has a boat card
+        if (len(self.boat_cards) < 2):
+            self.set_water_weight(DEFAULT_WATER_WEIGHT)
+        
+        return shortest
 
     # choose the optimal target based on current location and investigator positions
     def choose_closest_target(self):
@@ -175,6 +181,7 @@ class Jack:
         farthest_dist  = 0
         farthest_mean = 0
         
+        '''   Temporarily disable target choosing
         # Built a list of targets that aren't aren't too close to the investigators
         for target in self.targets:
             closest_dist = 100
@@ -204,14 +211,16 @@ class Jack:
             if closest_dist > 3:
                 self.godmode_print("Adding " + target + " to the candidate list.")
                 candidates.append(target)
-        
+
         # If we have targets that are not too close, pick one randomly
         if len(candidates) > 0:
             self.active_target = random.choice(candidates)
         else:
             self.godmode_print("All the targets are close to an investigator. Choosing the farthest of all 4...")
             self.active_target = farthest_target
-                
+        '''
+        
+        self.active_target = random.choice(self.targets)
         self.godmode_print("Jack chooses ", self.active_target)
         
         
@@ -245,24 +254,21 @@ class Jack:
                 self.graph.ep.weight[e] += adjust
 
     # Discourage Jack from taking paths near inspectors by increasing the weights
-    # This couldbe written recursivesly to allow more easy fine-tuning of the radiating weights over a distance
-    # rather than being hardcoded to be only across a distance of 2
     def discourage(self, adjust):
         for num in range (0, 3):
             # Find the vertex belonging to the `num` inspector
             v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-            
-            # Add a weight to all the edges one vertex away from the inspector
-            for n in v.out_neighbors():
-                for e in n.all_edges():
-                    self.graph.ep.weight[e] += adjust
-                    
-                # Also weight to everything 2 vertices away, which will have a compounding effect 
-                # on the inbound edges leading toward the inspect since they were already adjusted above
-                for n1 in n.out_neighbors():
-                    for e1 in n1.all_edges():
-                        self.graph.ep.weight[e1] += adjust
+            # follow paths up to 3 away and adjust them all
+            self.discourage_recursion(v, adjust, 3)
 
+    def discourage_recursion(self, v, adjust, depth):
+        depth = depth - 1
+        # Add a weight to all the edges one vertex away from v
+        for n in v.out_neighbors():
+            for e in n.all_edges():
+                self.graph.ep.weight[e] += adjust
+            if depth > 0:
+                self.discourage_recursion(n, adjust, depth)
 
     def status(self):
         print()
@@ -282,24 +288,7 @@ class Jack:
         for edge in self.graph.edges():
             if self.graph.ep.transport[edge] == WATER:
                 self.graph.ep.weight[edge] = weight
-    
-    
-    # Calculate the number of vertices away from the target - every vertex should have a weight of 1
-    def hop_count(self, src, dest):
-        #unweight the water paths if Jack still has a boat card
-        if (len(self.boat_cards) < 2):
-            self.set_water_weight(1)
-        
-        v = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
-        shortest = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, src)[0], v, 
-                                                            weights=self.graph.ep.weight)
-
-        #re-weight the water paths if Jack still has a boat card
-        if (len(self.boat_cards) < 2):
-            self.set_water_weight(DEFAULT_WATER_WEIGHT)
-        
-        return shortest
-        
+            
     
     # If Jack is running out of moves,
     # or he is trying to reach the final target, 
@@ -380,16 +369,17 @@ class Jack:
             
         move_type = NORMAL_MOVE
 
-        # Always consider what is the best target to try - do this before poisoning/weighting routes
+        # Each turn reconsider what is the best target to try
+        # Do this before poisoning the routes
         self.choose_closest_target()
         
         # Poison the position of the inspectors (i.e. add weights)
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
         self.poison(1000)
-        deterrent = random.choice([0,1,1,1])
+        deterrent = random.choice([0.5, 0.5 , 0.5, 0.5])  #TODO : would random weights help make it not as predictable behavior?
         self.discourage(deterrent)
         self.consider_desperate_weights(True)
-        
+                
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
         
@@ -398,8 +388,7 @@ class Jack:
 
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
-        if shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], vlist[1], 
-                                                            weights=self.graph.ep.weight) >= 1000:
+        if shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= 1000:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
                 # do coach move
                 move_type = COACH_MOVE
@@ -436,6 +425,7 @@ class Jack:
             self.set_water_weight(1000)
             vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
             self.set_water_weight(DEFAULT_WATER_WEIGHT)
+            
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
             self.godmode_print([self.graph.vp.ids[v] for v in vlist])
         

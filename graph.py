@@ -6,7 +6,7 @@ LAND = 0
 WATER = 1
 ALLEY = 2
 
-ug = Graph(edge_list, hashed=True, eprops=[("weight", "int"), ("transport", "int")])
+ug = Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
 vshape = ug.new_vp("string")
@@ -111,6 +111,25 @@ def parse_jackpos(user_input):
             value = "BAD"
     return value
 
+def parse_cost(user_input):
+    # Use regular expression to match the alphanumeric values
+    match = re.search(r'cost\s(.+)', user_input)
+    values = []
+    # Extract the alphanumeric values
+    if match:
+        values = match.group(1).split(',')
+        values = [value.strip() for value in values]
+        if (len(values) != 2):
+            print("Must enter two locations")
+            return
+        for value in values:
+            if len(find_vertex(ug, ug.vp.ids, value)) == 0:
+                values = []
+                print(value, " is not a valid location.")
+                return
+        print (jack.hop_count(values[0], values[1]))
+                
+                
 def process_input(user_input):
     if user_input == "jack":
         jack.move()
@@ -151,6 +170,9 @@ def process_input(user_input):
         pos = parse_jackpos(user_input)
         if (pos != "BAD"):
             jack.pos = pos
+
+    elif jack.godmode and "cost" in user_input:
+        parse_cost(user_input)
             
     elif "help" in user_input:
         print("Commands are:")
@@ -164,6 +186,7 @@ def process_input(user_input):
         print("   pdf:                          Force the PDF file to be updated immediately with the current game state")
         print("   exit:                         Completely exit the program.")
         jack.godmode_print("   jackpos <pos>:                Move Jack to the specified location for debugging")
+        jack.godmode_print("   cost <pos1>, <pos2>:          Show the distance between two vertices (for weight debugging)")
     else:
         print("Unknown command.")
 

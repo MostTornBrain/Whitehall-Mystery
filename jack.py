@@ -103,7 +103,7 @@ class Jack:
                       pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
                       edge_marker_size=4,
                       edge_control_points=control,
-                      output="graph-draw.pdf")
+                      output="jack.pdf")
 
 
     def godmode_print(self, *msg):

@@ -9,6 +9,7 @@ BOAT_MOVE = 1
 COACH_MOVE = 2
 ALLEY_MOVE = 3
 DEFAULT_WATER_WEIGHT = 10
+POISON = 1000
 
 def reset_graph_color_and_shape(ug):
     # iterate over all the nodes
@@ -173,7 +174,7 @@ class Jack:
         
         self.active_target = best_option
         self.godmode_print("Best distance", best_distance)
-        self.godmode_print("Jack chooses ", self.active_target)
+        self.godmode_print("Jack chooses \033[1m", self.active_target, "\033[0m")
 
 
     def choose_starting_target(self):            
@@ -343,6 +344,73 @@ class Jack:
                 ret = COACH_MOVE
         return ret
 
+    # Choose the path when Jack has decided he needs to use a coach
+    def pick_a_coach_path(self):
+        # compute shortest path without any poisoned paths since Jack can move through investigators using a coach
+        # but... Jack cannot take a boat at the same time, so poison the water routes
+        self.set_water_weight(POISON)
+        
+        # decide on a path
+        deterrents = [2, 1, 0.5, 0.25, 0]
+        for deterrent in deterrents:
+            v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+            v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+
+            self.discourage(deterrent)
+            vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+            self.discourage(-deterrent)
+            
+            # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
+            cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
+            self.godmode_print("   Considering coach cost: ", cost)
+            
+            if (cost <= (16 - self.turn_count())):
+                self.godmode_print("   Jack finds this cost acceptable.")
+                break;
+        
+        self.set_water_weight(DEFAULT_WATER_WEIGHT)
+        return vlist
+    
+    
+    def pick_a_path(self, deterrent):
+        move_type = NORMAL_MOVE
+        
+        # Poison the position of the inspectors (i.e. add weights)
+        # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
+        self.poison(POISON)
+        self.discourage(deterrent)
+        self.consider_desperate_weights(True)
+                
+        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+        
+        vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+        self.godmode_print([self.graph.vp.ids[v] for v in vlist])
+
+        # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
+        # determine if any move is possible or if Jack is trapped and loses.
+        if shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= POISON:
+            if (len(self.coach_cards) < 2 and self.turn_count() < 13):
+                # do coach move
+                move_type = COACH_MOVE
+            # TODO: consider alleys
+            else:
+                print("Jack cannot move.  You win!")
+                print("Jack's current position: ", self.pos)
+                self.game_in_progress = False
+
+        # un-poison the ipos edges
+        self.poison(-POISON)
+        self.discourage(-deterrent)
+        self.consider_desperate_weights(False)
+        
+        # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
+        cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
+        self.godmode_print("    Cost: ", cost)
+        
+        return [vlist, cost, move_type]
+        
+        
     def move(self):
         if (not self.game_in_progress):
             print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
@@ -366,43 +434,21 @@ class Jack:
             self.make_pdf()
             self.game_in_progress = False
             return
-            
-        move_type = NORMAL_MOVE
-
+        
         # Each turn reconsider what is the best target to try
         # Do this before poisoning the routes
         self.choose_closest_target()
         
-        # Poison the position of the inspectors (i.e. add weights)
-        # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
-        self.poison(1000)
-        deterrent = random.choice([0.5, 0.5 , 0.5, 0.5])  #TODO : would random weights help make it not as predictable behavior?
-        self.discourage(deterrent)
-        self.consider_desperate_weights(True)
-                
-        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
-        
-        vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-        self.godmode_print([self.graph.vp.ids[v] for v in vlist])
-
-        # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
-        # determine if any move is possible or if Jack is trapped and loses.
-        if shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= 1000:
-            if (len(self.coach_cards) < 2 and self.turn_count() < 13):
-                # do coach move
-                move_type = COACH_MOVE
-            # TODO: consider alleys
-            else:
-                print("Jack cannot move.  You win!")
-                print("Jack's current position: ", self.pos)
+        # decide on a path
+        deterrents = [2, 1, 0.5, 0.25, 0]
+        for deterrent in deterrents:
+            vlist, cost, move_type = self.pick_a_path(deterrent)
+            if not self.game_in_progress:
                 return
-
-        # un-poison the ipos edges
-        self.poison(-1000)
-        self.discourage(-deterrent)
-        self.consider_desperate_weights(False)
-                      
+            if (cost <= (16 - self.turn_count())):
+                self.godmode_print("   Jack finds this cost acceptable.")
+                break;
+        
         # If a water path was selected, spend the card - NOTE: this should never happen if a coach move was selected above so we do not check for move_type being set to COACH_MOVE
         if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
             print("Jack took a boat on turn %d!" % len(self.path_used))
@@ -410,7 +456,7 @@ class Jack:
             move_type = BOAT_MOVE
             if (len(self.boat_cards)>= 2):
                 # poison all the water paths - Jack has no boat cards left
-                self.set_water_weight(1000)
+                self.set_water_weight(POISON)
         
         # Have you consider the advantages to taking a COACH?
         if (move_type == NORMAL_MOVE):
@@ -420,11 +466,7 @@ class Jack:
                 
         
         if (move_type == COACH_MOVE):
-            # recompute shortest path without any poisoned paths since Jack can move through investigators using a coach
-            # but... Jack cannot take a boat at the same time, so poison the water routes
-            self.set_water_weight(1000)
-            vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-            self.set_water_weight(DEFAULT_WATER_WEIGHT)
+            vlist = self.pick_a_coach_path()
             
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
             self.godmode_print([self.graph.vp.ids[v] for v in vlist])

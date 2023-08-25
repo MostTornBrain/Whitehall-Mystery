@@ -193,9 +193,9 @@ def process_input(user_input):
 # Input loop
 while True:
     if (jack.godmode):
-        user_input = input("godmode > ")
+        user_input = input("\033[1mgodmode > \033[0m")
     else:
-        user_input = input("> ")
+        user_input = input("\033[1m> \033[0m")
     
     if user_input == "exit":
         print("Goodbye!")

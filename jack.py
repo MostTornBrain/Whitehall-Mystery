@@ -26,13 +26,13 @@ from graph_tool.all import *
 from graph_data import *
 import random
 
-WATER = 1
-
 NORMAL_MOVE = 0
 BOAT_MOVE = 1
-COACH_MOVE = 2
-ALLEY_MOVE = 3
+ALLEY_MOVE = 2
+COACH_MOVE = 3
+
 DEFAULT_WATER_WEIGHT = 10
+DEFAULT_ALLEY_WEIGHT = 10
 POISON = 1000
 
 def reset_graph_color_and_shape(ug):
@@ -71,6 +71,7 @@ class Jack:
         self.graph = g
         self.ipos = ipos
         self.godmode = False
+        self.win = None
         
         self.game_in_progress = False
         
@@ -121,12 +122,13 @@ class Jack:
         # This will make the two edges overlap and look like a single edge with an arrow on each end.
         control = [0.3, 0, 0.7, 0]
     
-        graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
+        self.win = graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
                       vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
                       vertex_font_size=self.graph.vp.vfsize,
                       pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
                       edge_marker_size=4,
                       edge_control_points=control,
+                      #window=self.win, return_window=True, main=False)
                       output="jack.pdf")
 
 
@@ -147,7 +149,8 @@ class Jack:
         self.alley_cards = []
         self.coach_cards = []
         
-        self.set_water_weight(DEFAULT_WATER_WEIGHT)
+        self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
+        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         
         for q in quads:
             self.targets.append(random.choice(q))
@@ -170,7 +173,7 @@ class Jack:
     def hop_count(self, src, dest):
         #unweight the water paths if Jack still has a boat card
         if (len(self.boat_cards) < 2):
-            self.set_water_weight(1)
+            self.set_travel_weight(BOAT_MOVE, 1)
         
         v1 = find_vertex(self.graph, self.graph.vp.ids, src)[0]
         v2 = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
@@ -178,7 +181,7 @@ class Jack:
 
         #re-weight the water paths if Jack still has a boat card
         if (len(self.boat_cards) < 2):
-            self.set_water_weight(DEFAULT_WATER_WEIGHT)
+            self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
         
         return shortest
 
@@ -271,15 +274,15 @@ class Jack:
         return self.graph.vp.ids[vlist[index]]
 
     # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
-    def poison(self, adjust):
+    def poison_investigators(self, adjust):
         for num in range (0, 3):
             v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         
             for e in v.all_edges():
                 self.graph.ep.weight[e] += adjust
 
-    # Discourage Jack from taking paths near inspectors by increasing the weights
-    def discourage(self, adjust):
+    # Discourage Jack from taking paths near investigators by increasing the weights
+    def discourage_investigators(self, adjust):
         for num in range (0, 3):
             # Find the vertex belonging to the `num` inspector
             v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
@@ -309,9 +312,9 @@ class Jack:
         print
         
 
-    def set_water_weight(self, weight):
+    def set_travel_weight(self, transport_type, weight):
         for edge in self.graph.edges():
-            if self.graph.ep.transport[edge] == WATER:
+            if self.graph.ep.transport[edge] == transport_type:
                 self.graph.ep.weight[edge] = weight
             
     
@@ -328,7 +331,7 @@ class Jack:
                 weight = DEFAULT_WATER_WEIGHT
             
             if (len(self.boat_cards) < 2):
-                self.set_water_weight(weight)
+                self.set_travel_weight(BOAT_MOVE, weight)
 
     def turn_count(self):
         return len(self.path_used)
@@ -389,7 +392,8 @@ class Jack:
         # compute shortest path without any poisoned paths since Jack can move through investigators using a coach
         # but... Jack cannot take a boat at the same time, so poison the water routes
         
-        self.set_water_weight(POISON)
+        self.set_travel_weight(BOAT_MOVE, POISON)
+        self.set_travel_weight(ALLEY_MOVE, POISON)
         
         # decide on a path
         deterrents = [2, 1, 0.5, 0.25, 0]
@@ -397,9 +401,9 @@ class Jack:
             v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
             v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
 
-            self.discourage(deterrent)
+            self.discourage_investigators(deterrent)
             vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-            self.discourage(-deterrent)
+            self.discourage_investigators(-deterrent)
             
             # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
             cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
@@ -412,17 +416,18 @@ class Jack:
                 self.godmode_print("   Jack finds this cost acceptable.")
                 break;
         
-        self.set_water_weight(DEFAULT_WATER_WEIGHT)
+        self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
+        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         return vlist
     
     
     def pick_a_path(self, deterrent):
         move_type = NORMAL_MOVE
         
-        # Poison the position of the inspectors (i.e. add weights)
+        # Poison the position of the investigators (i.e. add weights)
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
-        self.poison(POISON)
-        self.discourage(deterrent)
+        self.poison_investigators(POISON)
+        self.discourage_investigators(deterrent)
         self.consider_desperate_weights(True)
                 
         v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
@@ -437,20 +442,27 @@ class Jack:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
                 # do coach move
                 move_type = COACH_MOVE
-            # TODO: consider alleys
             else:
                 print("Jack cannot move.  You win!")
                 print("Jack's current position: ", self.pos)
                 self.game_in_progress = False
 
         # un-poison the ipos edges
-        self.poison(-POISON)
-        self.discourage(-deterrent)
+        self.poison_investigators(-POISON)
+        self.discourage_investigators(-deterrent)
         self.consider_desperate_weights(False)
         
         # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
         cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
         self.godmode_print("    Cost: ", cost)
+
+        # Going from a water space to another water space - must be using a boat
+        if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
+            move_type = BOAT_MOVE
+            
+        # Jack didn't pass through any crossings - must be using an alley
+        elif 'c' not in self.graph.vp.ids[vlist[1]]:
+            move_type = ALLEY_MOVE
         
         return [vlist, cost, move_type]
         
@@ -493,22 +505,29 @@ class Jack:
                 self.godmode_print("   Jack finds this cost acceptable.")
                 break;
         
-        # If a water path was selected, spend the card - NOTE: this should never happen if a coach move was selected above so we do not check for move_type being set to COACH_MOVE
-        if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
+        # If a water path was selected, spend the card
+        if move_type == BOAT_MOVE:
             print("Jack took a boat on turn %d!" % len(self.path_used))
             self.boat_cards.append(self.turn_count())
-            move_type = BOAT_MOVE
             if (len(self.boat_cards)>= 2):
                 # poison all the water paths - Jack has no boat cards left
-                self.set_water_weight(POISON)
+                self.set_travel_weight(BOAT_MOVE, POISON)
+
+        # If a alley path was selected, spend the card
+        elif move_type == ALLEY_MOVE:
+            print("Jack snuck through an alley on turn %d!" % len(self.path_used))
+            self.alley_cards.append(self.turn_count())
+            if (len(self.alley_cards)>= 2):
+                # poison all the alley paths - Jack has no alley cards left
+                self.set_travel_weight(ALLEY_MOVE, POISON)
         
-        # Have you consider the advantages to taking a COACH?
+        # Have you considered the advantages to taking a COACH?
         if (move_type == NORMAL_MOVE):
             # If we are one space away from the goal, don't use a coach, otherwise, think about it.
             if (self.hop_count(self.pos, self.active_target) != 1):
                 move_type = self.consider_coach_move()
                 
-        
+        # If we decide we should use a coach, revise the path since we can move through investigators
         if (move_type == COACH_MOVE):
             vlist = self.pick_a_coach_path()
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
@@ -521,7 +540,7 @@ class Jack:
         shortest = self.hop_count(self.pos, self.active_target)
         
         # If Jack is doing a coach move, he moves a second time.
-        # Since we aready computed the shortest path above, just go to the next location in that path.
+        # Since we aready computed the shortest path above, just go to the next location in that path, but make sure it isn't a goal.
         if (move_type == COACH_MOVE):
             print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)
@@ -590,8 +609,8 @@ class Jack:
 
         return id_list[vlist[index]]
 
-    # Let inspectors always move towards Jack to test Jack's algorithm
-    def move_inspectors(g, ipos, jack_pos):
+    # Let investigators always move towards Jack to test Jack's algorithm
+    def move_investigators(g, ipos, jack_pos):
         for num in range (0, 3):
             v1 = find_vertex(g, g.vp.ids, ipos[num])[0]
             v2 = find_vertex(g, g.vp.ids, jack_pos)[0]

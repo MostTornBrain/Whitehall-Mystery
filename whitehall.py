@@ -52,7 +52,7 @@ for node in ug.vertices():
 
 # We don't want the water or alley paths (edges) to be visible
 for edge in ug.edges():
-    if ug.ep.transport[edge] == WATER:
+    if (ug.ep.transport[edge] == WATER) or (ug.ep.transport[edge] == ALLEY):
         ecolor[edge] = "#ffffff"
     else:
         ecolor[edge] = "#000000"

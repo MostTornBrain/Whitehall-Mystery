@@ -312,10 +312,24 @@ class Jack:
 
     def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach
-        # Need to figure out how to pick another vertex that is 1 space away and isn't where he was previously
-        print("Sorry, I have not yet implemented this type of move for Jack.")
-        print("Jack was surrounded by investigators and tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly there.")
-        print("Jack was at location " + prior_location + " and is currently at " + self.pos)
+        # Pick another vertex that is 1 space away and isn't where he was previously, since that is also against the rules
+        cur_pos = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        # Find locations (i.e. not crossings) with a weighted distance of 1
+        dist_map = list(shortest_distance(self.graph, cur_pos, max_dist=1, weights=self.graph.ep.weight))
+        vertices_with_distance_one = [
+            self.graph.vp.ids[v] for v in self.graph.iter_vertices() if (dist_map[v] == 1 and 'c' not in self.graph.vp.ids[v])
+        ]
+        if prior_location in vertices_with_distance_one:
+            vertices_with_distance_one.remove(prior_location)
+        self.godmode_print("These are all 1 away from ", self.pos)
+        self.godmode_print(vertices_with_distance_one)
+        if (len(vertices_with_distance_one) > 0):
+            choice = random.choice(vertices_with_distance_one)
+            self.godmode_print("Choosing:", choice)
+        else:
+            choice = "NULL"
+        return choice
+
     
     def consider_coach_move(self):
         ret = NORMAL_MOVE
@@ -348,6 +362,7 @@ class Jack:
     def pick_a_coach_path(self):
         # compute shortest path without any poisoned paths since Jack can move through investigators using a coach
         # but... Jack cannot take a boat at the same time, so poison the water routes
+        
         self.set_water_weight(POISON)
         
         # decide on a path
@@ -364,6 +379,9 @@ class Jack:
             cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
             self.godmode_print("   Considering coach cost: ", cost)
             
+            # TODO: Make sure Jack doesn't choose a path 2 away from the goal as that is against the rules
+            # NOTE: we currently enforce this rule elsewhere in the code in move().
+                
             if (cost <= (16 - self.turn_count())):
                 self.godmode_print("   Jack finds this cost acceptable.")
                 break;
@@ -467,7 +485,6 @@ class Jack:
         
         if (move_type == COACH_MOVE):
             vlist = self.pick_a_coach_path()
-            
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
             self.godmode_print([self.graph.vp.ids[v] for v in vlist])
         
@@ -483,15 +500,26 @@ class Jack:
             print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)
             self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
+            
             if (shortest > 1):
                 self.pos = self.find_second_location(vlist)
-                self.path_used.append(self.pos)
             else:
-                self.find_adjacent_nongoal_vertex(self.path_used[-2])
+                # make sure we don't use a coach to get to the goal - pick another location 1 space away
+                self.pos = self.find_adjacent_nongoal_vertex(self.path_used[-2])
+                
+                if self.pos == "NULL":
+                    # I _think_ this case is impossible based on the map layout, but just in case....
+                    print("Jack LOSES!")
+                    print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")
+                    print("Jak tried to find another location 1 space away, but there was no other legal place to move, so he is trapped.")
+                    print("Jack was at location " + prior_location + " and is currently at " + self.pos)
+                    print("Here is the full path he took:", self.path_used)
+                    return
+            self.path_used.append(self.pos)
+            
             # Count how far away the goal is now that Jack moved
             shortest = self.hop_count(self.pos, self.active_target)
-
-                
+        
         self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
 
         print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")

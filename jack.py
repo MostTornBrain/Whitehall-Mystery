@@ -348,13 +348,15 @@ class Jack:
             average = average / 3
             self.godmode_print("Average = ", average)
             
+            on_clue = (self.pos in self.clues) or (self.pos == self.crimes[-1])
+            
             # If the investigator crossing is adjacent to Jack, or all the investigators on average are close, 
             # or Jack is searching for the final target on his list and the investigators are somewhat close,
             # it is "too close", so Jack should use a coach card.
             # TODO - add some random variability to the threshold?  
             #        or maybe if the number of clues found is over X _and_ the average is < Y
             #        or maybe if the running average is < X over Y turns?
-            if (closest < 2 or average < 2.5) or (len(self.targets) == 1 and average < 4):
+            if ((closest < 2 and on_clue) or average < 2.5) or (len(self.targets) == 1 and average < 4):
                 ret = COACH_MOVE
         return ret
 

@@ -291,12 +291,14 @@ class Jack:
 
     def discourage_recursion(self, v, adjust, depth):
         depth = depth - 1
-        # Add a weight to all the edges one vertex away from v
-        for n in v.out_neighbors():
-            for e in n.all_edges():
-                self.graph.ep.weight[e] += adjust
-            if depth > 0:
-                self.discourage_recursion(n, adjust, depth)
+        # Add a weight to all the edges one vertex away from v, following only routes an investigator can take, otherwise alleys cause an exponential increasing of deterrents
+        for out_edge in v.out_edges():
+            if (self.graph.ep.transport[out_edge] == NORMAL_MOVE):
+                n = out_edge.target()
+                for e in n.all_edges():
+                    self.graph.ep.weight[e] += adjust
+                if depth > 0:
+                    self.discourage_recursion(n, adjust, depth)
 
     def status(self):
         print()
@@ -413,7 +415,7 @@ class Jack:
             # NOTE: we currently enforce this rule elsewhere in the code in move().
                 
             if (cost <= (16 - self.turn_count())):
-                self.godmode_print("   Jack finds this cost acceptable.")
+                self.godmode_print("   Jack finds this coach cost acceptable.")
                 break;
         
         self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)

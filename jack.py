@@ -446,20 +446,19 @@ class Jack:
         self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
         self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         return vlist
-    
-    
-    def pick_a_path(self, deterrent):
+
+    def pick_a_path_helper(self, deterrent):
         move_type = NORMAL_MOVE
-        
+
         # Poison the position of the investigators (i.e. add weights)
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
         self.poison_investigators(POISON)
         self.discourage_investigators(deterrent)
         self.consider_desperate_weights(True)
-                
+            
         v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
-        
+    
         vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         self.godmode_print([self.graph.vp.ids[v] for v in vlist])
 
@@ -478,7 +477,7 @@ class Jack:
         self.poison_investigators(-POISON)
         self.discourage_investigators(-deterrent)
         self.consider_desperate_weights(False)
-        
+    
         # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
         cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
         self.godmode_print("    Cost: ", cost)
@@ -486,13 +485,37 @@ class Jack:
         # Going from a water space to another water space - must be using a boat
         if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
             move_type = BOAT_MOVE
-            
+        
         # Jack didn't pass through any crossings - must be using an alley
         elif 'c' not in self.graph.vp.ids[vlist[1]]:
             move_type = ALLEY_MOVE
-        
+    
         return [vlist, cost, move_type]
         
+    
+    def pick_a_path(self, deterrent):        
+        path_ok = False
+        alleys_poison = False
+        
+        # Need to loop in case an alley was chosen for the final target.
+        while(not path_ok):
+            vlist, cost, move_type = self.pick_a_path_helper(deterrent)
+            
+            # Check to make sure we are using an alley to get to the target, as that isn't allow per the rules
+            if (move_type == ALLEY_MOVE) and (self.graph.vp.ids[vlist[1]] == self.active_target):
+                self.godmode_print("Oops! Jack tried to use an alley to get to the goal.  That is not allowed.")
+                self.godmode_print("Recalculating...")
+                
+                # Make so Jack won't consider an alley
+                self.set_travel_weight(ALLEY_MOVE, POISON)
+                alleys_poison = True
+            else: 
+                path_ok = True
+                if (alleys_poison):
+                    self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+                    alleys_poison = False
+        
+        return [vlist, cost, move_type]
         
     def move(self):
         if (not self.game_in_progress):

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from graph_tool.all import *
+import graph_tool.all as gt
 from jack import *
 import re
 
@@ -30,7 +30,7 @@ LAND = 0
 WATER = 1
 ALLEY = 2
 
-ug = Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
+ug = gt.Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
 vshape = ug.new_vp("string")
@@ -41,14 +41,14 @@ ecolor = ug.new_edge_property("string")
 # Assign the x-y coordinates of everything
 vpos = ug.new_vp("vector<double>")
 for pair in positions:
-    #print(pair)
-    v=find_vertex(ug, ug.vp.ids, pair[0])[0]
+    #jack.print(pair)
+    v=gt.find_vertex(ug, ug.vp.ids, pair[0])[0]
     vpos[v] = pair[1]
 
 # Print out nodes with missing positions for help when editing by hand
 for node in ug.vertices():
     if not (vpos[node]):
-        print("        [\"%s\", [,-]]," % ug.vp.ids[node])
+        jack.print("        [\"%s\", [,-]]," % ug.vp.ids[node])
 
 # We don't want the water or alley paths (edges) to be visible
 for edge in ug.edges():
@@ -77,7 +77,7 @@ ug.save("my_graph.graphml")
 ipos = ["87c1", "77c1", "86c1"]
 jack = Jack(ug, ipos);
 
-jack.make_pdf()
+jack.make_image()
 
 ##########################################
 
@@ -90,9 +90,9 @@ def parse_ipos(user_input):
         values = match.group(1).split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' not in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
                 values = []
-                print(value, " is not a valid inspector location.")
+                jack.print(value, " is not a valid inspector location.")
                 break;
     return values;
 
@@ -105,9 +105,9 @@ def parse_clues(user_input):
         values = match.group(1).split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
                 values = []
-                print(value, " is not a valid location.")
+                jack.print(value, " is not a valid location.")
                 break;
     return values;
 
@@ -118,8 +118,8 @@ def parse_arrest(user_input):
     if match:
         value = match.group(1)
         value.strip()
-        if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
-            print(value, " is not a valid location.")
+        if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            jack.print(value, " is not a valid location.")
             value = "BAD"
     return value
 
@@ -130,8 +130,8 @@ def parse_jackpos(user_input):
     if match:
         value = match.group(1)
         value.strip()
-        if 'c' in value or len(find_vertex(ug, ug.vp.ids, value)) == 0:
-            print(value, " is not a valid location.")
+        if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            jack.print(value, " is not a valid location.")
             value = "BAD"
     return value
 
@@ -144,12 +144,12 @@ def parse_cost(user_input):
         values = match.group(1).split(',')
         values = [value.strip() for value in values]
         if (len(values) != 2):
-            print("Must enter two locations")
+            jack.print("Must enter two locations")
             return
         for value in values:
-            if len(find_vertex(ug, ug.vp.ids, value)) == 0:
+            if len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
                 values = []
-                print(value, " is not a valid location.")
+                jack.print(value, " is not a valid location.")
                 return
         print (jack.hop_count(values[0], values[1]))
                 
@@ -172,13 +172,13 @@ def process_input(user_input):
         if (len(values) == 3):
             jack.set_ipos(values)
         else:
-            print("Invalid input")
+            jack.print("Invalid input")
             
     elif user_input == "status":
         jack.status()
 
     elif user_input == "pdf":
-        jack.make_pdf()
+        jack.make_image()
         
     elif "arrest" in user_input:
         pos = parse_arrest(user_input)
@@ -199,33 +199,36 @@ def process_input(user_input):
         parse_cost(user_input)
             
     elif "help" in user_input:
-        print("Commands are:")
-        print("   jack:                         Jack takes his turn")
-        print("   start:                        Start a new game (CAUTION: typing this mid-game will RESTART the game)")
-        print("   godmode <on,off>:             Toggle godmode")
-        print("   ipos <pos1>, <pos2>, <pos3>:  Enter the inspector locations")
-        print("   status:                       View the current game status")
-        print("   arrest <pos>:                 Attempt arrest at the specified position")
-        print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
-        print("   pdf:                          Force the PDF file to be updated immediately with the current game state")
-        print("   exit:                         Completely exit the program.")
+        jack.print("Commands are:")
+        jack.print("   jack:                         Jack takes his turn")
+        jack.print("   start:                        Start a new game (CAUTION: typing this mid-game will RESTART the game)")
+        jack.print("   godmode <on,off>:             Toggle godmode")
+        jack.print("   ipos <pos1>, <pos2>, <pos3>:  Enter the inspector locations")
+        jack.print("   status:                       View the current game status")
+        jack.print("   arrest <pos>:                 Attempt arrest at the specified position")
+        jack.print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
+        jack.print("   pdf:                          Force the PDF file to be updated immediately with the current game state")
+        jack.print("   exit:                         Completely exit the program.")
         jack.godmode_print("   jackpos <pos>:                Move Jack to the specified location for debugging")
         jack.godmode_print("   cost <pos1>, <pos2>:          Show the distance between two vertices (for weight debugging)")
     else:
-        print("Unknown command.")
+        jack.print("Unknown command.")
 
-# Input loop
-while True:
-    if (jack.godmode):
-        user_input = input("\033[1mgodmode > \033[0m")
-    else:
-        user_input = input("\033[1m> \033[0m")
+def command_line_ui():
+    # Input loop
+    while True:
+        if (jack.godmode):
+            user_input = input("\033[1mgodmode > \033[0m")
+        else:
+            user_input = input("\033[1m> \033[0m")
     
-    if user_input == "exit":
-        print("Goodbye!")
-        break
+        if user_input == "exit":
+            jack.print("Goodbye!")
+            break
 
-    process_input(user_input)
+        process_input(user_input)
+
+command_line_ui()
 
 # Save the graph so I can debug the contents to make sure I'm 
 # building it correctly and restoring weights correctly

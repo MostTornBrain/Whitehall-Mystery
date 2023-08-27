@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from graph_tool.all import *
+import graph_tool.all as gt
 from graph_data import *
 import random
 
@@ -35,35 +35,35 @@ DEFAULT_WATER_WEIGHT = 10
 DEFAULT_ALLEY_WEIGHT = 10
 POISON = 1000
 
-def reset_graph_color_and_shape(ug):
+def reset_graph_color_and_shape(ug, scale=1):
     # iterate over all the nodes
     for node in ug.vertices():
         ug.vp.vcolor[node] = "#000000"
     
         if 'c' in ug.vp.ids[node]:
             ug.vp.vshape[node] = "square"
-            ug.vp.vsize[node] = 8
-            ug.vp.vfsize[node] = 8
+            ug.vp.vsize[node] = 8*scale
+            ug.vp.vfsize[node] = 8*scale
         else:
             ug.vp.vshape[node] = "circle"
-            ug.vp.vsize[node] = 18
-            ug.vp.vfsize[node] = 10
+            ug.vp.vsize[node] = 18*scale
+            ug.vp.vfsize[node] = 10*scale
 
     # Color ispector starting positions yellow
     for node in starting_ipos:
         # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
-        v = find_vertex(ug, ug.vp.ids, node)[0]
+        v = gt.find_vertex(ug, ug.vp.ids, node)[0]
         ug.vp.vcolor[v] = "#FFD700"
 
     # Color all the destinations in the four quadrants white
     for q in quads:
         for num in q:
-            v = find_vertex(ug, ug.vp.ids, num)[0]    
+            v = gt.find_vertex(ug, ug.vp.ids, num)[0]    
             ug.vp.vcolor[v] = "#ffffff"
 
     # Make water destinations blue
     for num in water:
-        v=find_vertex(ug, ug.vp.ids, num)[0]    
+        v=gt.find_vertex(ug, ug.vp.ids, num)[0]    
         ug.vp.vcolor[v] = "#0000FF"
 
 class Jack:
@@ -87,54 +87,56 @@ class Jack:
         
         self.path_used = []
         
-        print("   Welcome!")
-        print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
-        print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
-        print("   Then type \033[1mstart\033[0m to begin the game.")
+        self.print("   Welcome!")
+        self.print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
+        self.print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
+        self.print("   Then type \033[1mstart\033[0m to begin the game.")
 
-
-    def make_pdf(self):
+    def print(self, *msg):
+        print(*msg)
+    
+    def make_image(self, scale=2):
         # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
-        reset_graph_color_and_shape(self.graph)
+        reset_graph_color_and_shape(self.graph, scale)
         
         if (self.godmode):
             # show Jack on the map
             for loc in self.path_used:
-                self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = "cyan"
+                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = "cyan"
             if hasattr(self, 'pos'):
-                self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "cyan"
-                self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "double_circle"
+                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "cyan"
+                self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "double_circle"
         
         for target in self.crimes:    
-            self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
+            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
     
         for clue in self.clues:
-            self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = "yellow"
+            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = "yellow"
         
         for pos in self.ipos:
-            self.graph.vp.vshape[find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
+            self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
         
-        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = "yellow"
-        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = "blue"
-        self.graph.vp.vcolor[find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = "red"
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = "yellow"
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = "blue"
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = "red"
                 
         # We don't want curved edges - define a common Bezier control so the lines are straight.
         # This will make the two edges overlap and look like a single edge with an arrow on each end.
         control = [0.3, 0, 0.7, 0]
     
-        self.win = graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
+        self.win = gt.graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
                       vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
-                      vertex_font_size=self.graph.vp.vfsize,
-                      pos=self.graph.vp.pos, output_size=(873,873), edge_pen_width=1, edge_color=self.graph.ep.ecolor,
-                      edge_marker_size=4,
+                      vertex_font_size=self.graph.vp.vfsize, bg_color="white",
+                      pos=self.graph.vp.pos, output_size=(873*scale,873*scale), edge_pen_width=1*scale, edge_color=self.graph.ep.ecolor,
+                      edge_marker_size=4*scale,
                       edge_control_points=control,
                       #window=self.win, return_window=True, main=False)
-                      output="jack.pdf")
+                      output="jack.png")
 
 
     def godmode_print(self, *msg):
         if (self.godmode):
-            print(*msg)
+            self.print(*msg)
 
     def reset(self):
         self.game_in_progress = True
@@ -175,9 +177,9 @@ class Jack:
         if (len(self.boat_cards) < 2):
             self.set_travel_weight(BOAT_MOVE, 1)
         
-        v1 = find_vertex(self.graph, self.graph.vp.ids, src)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, dest)[0]
-        shortest = shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, src)[0]
+        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, dest)[0]
+        shortest = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
 
         #re-weight the water paths if Jack still has a boat card
         if (len(self.boat_cards) < 2):
@@ -197,7 +199,7 @@ class Jack:
                 best_distance = d
                 
         if best_option == 0:
-            print("Woah! That's wrong!")
+            self.print("Woah! That's wrong!")
         
         self.active_target = best_option
         self.godmode_print("Best distance", best_distance)
@@ -254,8 +256,8 @@ class Jack:
         
     def set_ipos(self, i):
         self.ipos = i
-        print("ipos: ", self.ipos)
-        self.make_pdf()
+        self.print("ipos: ", self.ipos)
+        self.make_image()
 
     def find_next_location(self, vlist):
         index = 1
@@ -276,7 +278,7 @@ class Jack:
     # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
     def poison_investigators(self, adjust):
         for num in range (0, 3):
-            v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+            v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         
             for e in v.all_edges():
                 self.graph.ep.weight[e] += adjust
@@ -285,7 +287,7 @@ class Jack:
     def discourage_investigators(self, adjust):
         for num in range (0, 3):
             # Find the vertex belonging to the `num` inspector
-            v = find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+            v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
             # follow paths up to 3 away and adjust them all
             self.discourage_recursion(v, adjust, 3)
 
@@ -301,14 +303,14 @@ class Jack:
                     self.discourage_recursion(n, adjust, depth)
 
     def status(self):
-        print()
-        print("Crimes: ", self.crimes)
-        print("Clues: ", self.clues)
-        print("ipos: ", self.ipos)
-        print("Coach cards: ", 2 - len(self.coach_cards))
-        print("Alley cards: ", 2 - len(self.alley_cards))
-        print("Boat cards:  ", 2 - len(self.boat_cards))
-        print("Moves remaining: ", 16 - self.turn_count())
+        self.print()
+        self.print("Crimes: ", self.crimes)
+        self.print("Clues: ", self.clues)
+        self.print("ipos: ", self.ipos)
+        self.print("Coach cards: ", 2 - len(self.coach_cards))
+        self.print("Alley cards: ", 2 - len(self.alley_cards))
+        self.print("Boat cards:  ", 2 - len(self.boat_cards))
+        self.print("Moves remaining: ", 16 - self.turn_count())
         self.godmode_print("Here is the path Jack took:", self.path_used)
         self.godmode_print("Targets: ", self.targets)
         print
@@ -342,9 +344,9 @@ class Jack:
     def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach
         # Pick another vertex that is 1 space away and isn't where he was previously, since that is also against the rules
-        cur_pos = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        cur_pos = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
         # Find locations (i.e. not crossings) with a weighted distance of 1
-        dist_map = list(shortest_distance(self.graph, cur_pos, max_dist=1, weights=self.graph.ep.weight))
+        dist_map = list(gt.shortest_distance(self.graph, cur_pos, max_dist=1, weights=self.graph.ep.weight))
         vertices_with_distance_one = [
             self.graph.vp.ids[v] for v in self.graph.iter_vertices() if (dist_map[v] == 1 and 'c' not in self.graph.vp.ids[v])
         ]
@@ -368,8 +370,8 @@ class Jack:
             
             # Find how far away each investigator is from Jack - don't use weights - we want to count edges
             for ipos in self.ipos:
-                v = find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
-                dist = shortest_distance(self.graph, find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
+                v = gt.find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
+                dist = gt.shortest_distance(self.graph, gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
                 self.godmode_print("ipos " + ipos + " is " + str(dist) + " away.")
                 average += dist
                 if dist < closest:
@@ -400,11 +402,11 @@ class Jack:
         # decide on a path
         deterrents = [2, 1, 0.5, 0.25, 0]
         for deterrent in deterrents:
-            v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-            v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+            v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+            v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
 
             self.discourage_investigators(deterrent)
-            vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+            vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
             self.discourage_investigators(-deterrent)
             
             # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
@@ -432,21 +434,21 @@ class Jack:
         self.discourage_investigators(deterrent)
         self.consider_desperate_weights(True)
                 
-        v1 = find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
         
-        vlist = random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+        vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
         self.godmode_print([self.graph.vp.ids[v] for v in vlist])
 
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
-        if shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= POISON:
+        if gt.shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= POISON:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
                 # do coach move
                 move_type = COACH_MOVE
             else:
-                print("Jack cannot move.  You win!")
-                print("Jack's current position: ", self.pos)
+                self.print("Jack cannot move.  You win!")
+                self.print("Jack's current position: ", self.pos)
                 self.game_in_progress = False
 
         # un-poison the ipos edges
@@ -471,25 +473,25 @@ class Jack:
         
     def move(self):
         if (not self.game_in_progress):
-            print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
+            self.print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
             return
         
         # Per the rules, Jack does not announce he has reached his target until AFTER the investigators take their turn.
         # For this reason, we perform this check here before his next move.
         if self.pos == self.active_target:
-            print("A crime has been discovered at \033[1m" + self.pos + "\033[0m and Jack has moved on.")
+            self.print("A crime has been discovered at \033[1m" + self.pos + "\033[0m and Jack has moved on.")
             if (len(self.path_used) > 0):
                 # TODO: this isn't really part of the rules, but might be helpful during play
-                print("Here is the path he took:", self.path_used)
+                self.print("Here is the path he took:", self.path_used)
             self.crimes.append(self.pos)
             self.path_used = [self.pos]
             self.targets.remove(self.pos)
             self.clues = []
 
         if (len(self.targets) == 0):
-            print("Game over!  Jack won!")
-            print("    Crime locations: ", self.crimes)
-            self.make_pdf()
+            self.print("Game over!  Jack won!")
+            self.print("    Crime locations: ", self.crimes)
+            self.make_image()
             self.game_in_progress = False
             return
         
@@ -509,7 +511,7 @@ class Jack:
         
         # If a water path was selected, spend the card
         if move_type == BOAT_MOVE:
-            print("Jack took a boat on turn %d!" % len(self.path_used))
+            self.print("Jack took a boat on turn %d!" % len(self.path_used))
             self.boat_cards.append(self.turn_count())
             if (len(self.boat_cards)>= 2):
                 # poison all the water paths - Jack has no boat cards left
@@ -517,7 +519,7 @@ class Jack:
 
         # If a alley path was selected, spend the card
         elif move_type == ALLEY_MOVE:
-            print("Jack snuck through an alley on turn %d!" % len(self.path_used))
+            self.print("Jack snuck through an alley on turn %d!" % len(self.path_used))
             self.alley_cards.append(self.turn_count())
             if (len(self.alley_cards)>= 2):
                 # poison all the alley paths - Jack has no alley cards left
@@ -544,7 +546,7 @@ class Jack:
         # If Jack is doing a coach move, he moves a second time.
         # Since we aready computed the shortest path above, just go to the next location in that path, but make sure it isn't a goal.
         if (move_type == COACH_MOVE):
-            print("Jack takes a coach!")
+            self.print("Jack takes a coach!")
             self.coach_cards.append(self.turn_count()-1)
             self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
             
@@ -556,11 +558,11 @@ class Jack:
                 
                 if self.pos == "NULL":
                     # I _think_ this case is impossible based on the map layout, but just in case....
-                    print("Jack LOSES!")
-                    print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")
-                    print("Jak tried to find another location 1 space away, but there was no other legal place to move, so he is trapped.")
-                    print("Jack was at location " + prior_location + " and is currently at " + self.pos)
-                    print("Here is the full path he took:", self.path_used)
+                    self.print("Jack LOSES!")
+                    self.print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")
+                    self.print("Jack tried to find another location 1 space away, but there was no other legal place to move, so he is trapped.")
+                    self.print("Jack was at location " + prior_location + " and is currently at " + self.pos)
+                    self.print("Here is the full path he took:", self.path_used)
                     return
             self.path_used.append(self.pos)
             
@@ -569,35 +571,35 @@ class Jack:
         
         self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
 
-        print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")
+        self.print("Jack has \033[1m", 16 - self.turn_count(), "\033[0m moves remaining.")
 
         # If shortest path is longer than remaining turns
         if (16 - self.turn_count() < shortest):
-            print("Jack LOSES!  He cannot reach his target with the number of moves left.")
-            print("Here is the path he took:", self.path_used)
+            self.print("Jack LOSES!  He cannot reach his target with the number of moves left.")
+            self.print("Here is the path he took:", self.path_used)
             return
-        self.make_pdf()
+        self.make_image()
 
     def clue_search(self, pos_list):
         #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.
-        print("\nSearching for clues at: ", pos_list)
+        self.print("\nSearching for clues at: ", pos_list)
         for loc in pos_list:
             if loc in self.path_used:
-                print("Clue found at ", loc, "!!")
+                self.print("Clue found at ", loc, "!!")
                 self.clues.append(loc)
-                self.make_pdf()
+                self.make_image()
                 break
             else:
-                print(loc, ": no clue")
+                self.print(loc, ": no clue")
 
     def arrest(self, pos):
         #TODO: verify arrest location is next to an ipos?  Or just have players enforce the rules themselves.
         if pos == self.pos:
-            print("Congratulations!  You arrested Jack at location ", pos, "!")
-            print("Here is the path he took:", self.path_used)
+            self.print("Congratulations!  You arrested Jack at location ", pos, "!")
+            self.print("Here is the path he took:", self.path_used)
             self.game_in_progress = False
         else:
-            print("Jack is not at location ", pos)
+            self.print("Jack is not at location ", pos)
 
 '''
     def find_next_ilocation(self, vlist, id_list):
@@ -614,15 +616,15 @@ class Jack:
     # Let investigators always move towards Jack to test Jack's algorithm
     def move_investigators(g, ipos, jack_pos):
         for num in range (0, 3):
-            v1 = find_vertex(g, g.vp.ids, ipos[num])[0]
-            v2 = find_vertex(g, g.vp.ids, jack_pos)[0]
+            v1 = gt.find_vertex(g, g.vp.ids, ipos[num])[0]
+            v2 = gt.find_vertex(g, g.vp.ids, jack_pos)[0]
             vlist, elist = shortest_path(g, v1, v2)
             #print([g.vp.ids[v] for v in vlist])
         
             pos = find_next_ilocation(vlist, g.vp.ids)
             ipos[num]=pos
             print("Inspector #" + str(num) + " moved to " + pos +" and is now " + 
-                str(shortest_distance(g, find_vertex(g, g.vp.ids, pos)[0], v2)) + " distance")
+                str(gt.shortest_distance(g, gt.find_vertex(g, g.vp.ids, pos)[0], v2)) + " distance")
 '''            
         
         

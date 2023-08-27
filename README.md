@@ -32,6 +32,6 @@ If Jack is trapped, or if the investigators are very close to him, he will also 
 
 ## Future work
 
-* Improve Jack's behavior so there is more randomness at times.  Perhaps have different states Jack can be in, so he acts less rationally for a span (if close to being caught, for example). 
+* Improve Jack's behavior so there is more randomness at times.  Perhaps have different states Jack can be in, so he acts less rationally for a span (if close to being caught, for example).  Jack currently doesn't do any "tricky" unpredictable moves like a human might.   Of course, Jack doesn't benefit from being able to hear people discussing where they think he is either. :-)
 * Improve the usage of the special cards.  Alleys tend to be used up fairly quickly with the current logic.
 * Make a full-featured GUI using mouse point-and-click for moving investigators, searching for clues, etc.  

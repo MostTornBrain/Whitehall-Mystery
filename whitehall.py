@@ -21,7 +21,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
-
 import graph_tool.all as gt
 from jack import *
 import re
@@ -154,7 +153,10 @@ def parse_cost(user_input):
         print (jack.hop_count(values[0], values[1]))
                 
                 
+                
 def process_input(user_input):
+    # NOTE: This does only very rudimentary syntax checking. It is NOT a feature-rich UI
+    #       For example, it does simple substring matching for some commands.
     if user_input == "jack":
         jack.move()
         
@@ -177,7 +179,7 @@ def process_input(user_input):
     elif user_input == "status":
         jack.status()
 
-    elif user_input == "pdf":
+    elif user_input == "img":
         jack.make_image()
         
     elif "arrest" in user_input:
@@ -197,20 +199,23 @@ def process_input(user_input):
 
     elif jack.godmode and "cost" in user_input:
         parse_cost(user_input)
+        
+    elif "exit" in user_input:
+        exit()
             
     elif "help" in user_input:
         jack.print("Commands are:")
-        jack.print("   jack:                         Jack takes his turn")
-        jack.print("   start:                        Start a new game (CAUTION: typing this mid-game will RESTART the game)")
-        jack.print("   godmode <on,off>:             Toggle godmode")
-        jack.print("   ipos <pos1>, <pos2>, <pos3>:  Enter the inspector locations")
-        jack.print("   status:                       View the current game status")
-        jack.print("   arrest <pos>:                 Attempt arrest at the specified position")
-        jack.print("   clues <pos1>,..,<posX>:       Search for clues at the supplied locations in the specified order")
-        jack.print("   pdf:                          Force the PDF file to be updated immediately with the current game state")
-        jack.print("   exit:                         Completely exit the program.")
-        jack.godmode_print("   jackpos <pos>:                Move Jack to the specified location for debugging")
-        jack.godmode_print("   cost <pos1>, <pos2>:          Show the distance between two vertices (for weight debugging)")
+        jack.print(" \033[1mjack\033[0m:    Jack takes his turn")
+        jack.print(" \033[1mstart\033[0m:   Start a new game (CAUTION: typing this mid-game will RESTART the game)")
+        jack.print(" \033[1mipos <pos1>, <pos2>, <pos3>\033[0m:  Enter the inspector locations")
+        jack.print(" \033[1mstatus\033[0m:    View the current game status")
+        jack.print(" \033[1marrest <pos>\033[0m:    Attempt arrest at the specified position")
+        jack.print(" \033[1mclues <pos1>,..,<posX>\033[0m:    Search for clues at the supplied locations in the specified order")
+        jack.print(" \033[1mimg\033[0m:    Force the img file to be updated immediately with the current game state")
+        jack.print(" \033[1mexit\033[0m:    Completely exit the program.")
+        jack.print(" \033[1mgodmode <on,off>\033[0m:    Toggle godmode")
+        jack.godmode_print("  \033[1mjackpos <pos>\033[0m:    Move Jack to the specified location for debugging")
+        jack.godmode_print("  \033[1mcost <pos1>, <pos2>\033[0m:    Show the distance between two vertices (for weight debugging)")
     else:
         jack.print("Unknown command.")
 
@@ -228,7 +233,16 @@ def command_line_ui():
 
         process_input(user_input)
 
-command_line_ui()
+def welcome():
+    jack.print("   Welcome!")
+    jack.print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
+    jack.print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
+    jack.print("   Then type \033[1mstart\033[0m to begin the game.")
+
+def register_output_reporter(func, handle):
+    jack.register_output_reporter(func, handle)
+    
+#command_line_ui()
 
 # Save the graph so I can debug the contents to make sure I'm 
 # building it correctly and restoring weights correctly

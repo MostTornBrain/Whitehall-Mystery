@@ -35,6 +35,18 @@ DEFAULT_WATER_WEIGHT = 10
 DEFAULT_ALLEY_WEIGHT = 10
 POISON = 1000
 
+TEXT_MSG=0
+IMG_REFRESH=1
+
+JACK_MOVE_COLOR = "#e6988f"
+WATER_COLOR = "#5eb2fb"
+STARTING_CROSSINGS_COLOR = "#ece99c"
+YELLOW_INVESTIGATOR_COLOR = "yellow"
+BLUE_INVESTIGATOR_COLOR = "#2929d5"
+RED_INVESTIGATOR_COLOR = "red"
+CLUE_COLOR = "#f3f342"
+CRIME_COLOR = "#dd1e1e"
+
 def reset_graph_color_and_shape(ug, scale=1):
     # iterate over all the nodes
     for node in ug.vertices():
@@ -53,7 +65,7 @@ def reset_graph_color_and_shape(ug, scale=1):
     for node in starting_ipos:
         # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
         v = gt.find_vertex(ug, ug.vp.ids, node)[0]
-        ug.vp.vcolor[v] = "#FFD700"
+        ug.vp.vcolor[v] = STARTING_CROSSINGS_COLOR
 
     # Color all the destinations in the four quadrants white
     for q in quads:
@@ -64,7 +76,7 @@ def reset_graph_color_and_shape(ug, scale=1):
     # Make water destinations blue
     for num in water:
         v=gt.find_vertex(ug, ug.vp.ids, num)[0]    
-        ug.vp.vcolor[v] = "#0000FF"
+        ug.vp.vcolor[v] = WATER_COLOR
 
 class Jack:
     def __init__(self, g, ipos):
@@ -79,6 +91,7 @@ class Jack:
         self.completed_targets = []
         self.crimes = []
         self.clues = []
+        self.output_func = None
         
         # For bookkeeping these get populated with the turn number they are used
         self.boat_cards = []
@@ -87,14 +100,21 @@ class Jack:
         
         self.path_used = []
         
-        self.print("   Welcome!")
-        self.print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
-        self.print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
-        self.print("   Then type \033[1mstart\033[0m to begin the game.")
-
+    def register_output_reporter(self, func, handle):
+        self.output_func = func
+        self.output_handle = handle
+        
     def print(self, *msg):
-        print(*msg)
-    
+        if (self.output_func == None):
+            print(*msg)
+        else:
+            self.output_func(self.output_handle, TEXT_MSG, *msg)
+            
+    def gui_refresh(self):
+        if (self.output_func is not None):
+            self.output_func(self.output_handle, IMG_REFRESH)
+        
+        
     def make_image(self, scale=2):
         # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
         reset_graph_color_and_shape(self.graph, scale)
@@ -102,23 +122,23 @@ class Jack:
         if (self.godmode):
             # show Jack on the map
             for loc in self.path_used:
-                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = "cyan"
+                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = JACK_MOVE_COLOR
             if hasattr(self, 'pos'):
-                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "cyan"
+                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = JACK_MOVE_COLOR
                 self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "double_circle"
         
         for target in self.crimes:    
-            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]] = "red"
+            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]] = CRIME_COLOR
     
         for clue in self.clues:
-            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = "yellow"
+            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = CLUE_COLOR
         
         for pos in self.ipos:
             self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
         
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = "yellow"
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = "blue"
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = "red"
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = YELLOW_INVESTIGATOR_COLOR
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = BLUE_INVESTIGATOR_COLOR
+        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = RED_INVESTIGATOR_COLOR
                 
         # We don't want curved edges - define a common Bezier control so the lines are straight.
         # This will make the two edges overlap and look like a single edge with an arrow on each end.
@@ -132,6 +152,9 @@ class Jack:
                       edge_control_points=control,
                       #window=self.win, return_window=True, main=False)
                       output="jack.png")
+        
+        # Trigger the map to refresh in the GUI
+        self.gui_refresh()
 
 
     def godmode_print(self, *msg):

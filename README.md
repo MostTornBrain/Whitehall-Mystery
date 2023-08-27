@@ -5,10 +5,19 @@ NOTE: This requires the python [graph-tool](https://graph-tool.skewed.de/static/
 
 Currently this is a work-in-progress.  I have transcribed the map into di-graph form and Jack is playable. The use of special cards still needs some refinement.
 
-A di-graph was needed so a weight can be assigned to ingress edges to a location, but not to outbound edges.  This allows path distance calculation to ignore the cost of crossings, since Jack goes from location to location.  However, it also will allow the graph to be updated with weights in crossings based on the players' positions so when a "best" path is chosen, investigators can be avoided.   Similarly, weights can be assigned to water crossings and alleys to influence how likely Jack will be to use them.
-
 The main goal is to allow human players to play against a computerized Jack, initially via text entry commands specifying move actions, looking for clues, and performing arrests. More distant goal is to perform moves via graphical interface.
 
-When the program runs, it will generate a PDF of the map and save it as `jack.pdf` in the current directory.  This will need to be viewed to know the intersection/crossing IDs so they can be entered as the players take their turns.  On each subsequent turn the PDF is updated to reflect discovered clues and the investigators positions.   There is also a command to generate the PDF on demand.
+To start, run `whitehall_gui.py`.   Assuming you have the graph-tool package installed, you should be presented with a fullscreen UI with the command-line-interface on the left and a graph view of the map state on the right.   Commands are entered in the small entry window on the lower left.
 
-Type `help` at the prompt to get a list of commands.
+![Starting Screen](whitehall.png)
+
+Type `help` at the prompt to get a full list of commands.  
+
+**Please note**: rules enforcement is assumed to be performed by the players.  Other than validating locations actually exist, there is no enforcement of where an investigator can move nor where clues or arrests can be mode.   However, when searching for clues using the `clues` command, if you provide a list, it will stop searching as soon as a clue is found, per the rules.  So, if Jack had visited locations 52 and 53, typing `clues 52, 53, 55` would only reveal a clue was found at 52.  But, the game will not check if the investigator were close enough to actually perform a clue search.  The players must ensure they enter legal searchs.  A future enhancement will add more rules enforcement for the players.
+
+To the best of my knowledge Jack always plays by the rules.  If you notice incorrect behavior for Jack, please let me know.
+
+If you want to see in detail what Jack is doing, you can enable "godmode" which is helpful for debugging and other diagnostics. When in godmode, you can move Jack to an arbitrary location to test behavior.
+
+## Theory of operation
+A di-graph was needed so a weight can be assigned to ingress edges to a location, but not to outbound edges.  This allows path distance calculation to ignore the cost of crossings, since Jack goes from location to location.  However, it also will allow the graph to be updated with weights in crossings based on the players' positions so when a "best" path is chosen, investigators can be avoided.   Similarly, weights can be assigned to water crossings and alleys to influence how likely Jack will be to use them.

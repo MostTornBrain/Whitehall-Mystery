@@ -241,7 +241,10 @@ def welcome():
 
 def register_output_reporter(func, handle):
     jack.register_output_reporter(func, handle)
-    
+
+def game_turn():
+    return jack.turn_count()-1
+
 #command_line_ui()
 
 # Save the graph so I can debug the contents to make sure I'm 

@@ -23,7 +23,7 @@ SOFTWARE.
 '''
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GdkPixbuf, Pango
+from gi.repository import Gtk, GdkPixbuf, Pango, Gdk
 import whitehall as wh
 import re
 
@@ -91,6 +91,7 @@ def process_output(handle, output_type, *msg):
     # handle = [text_view, image_widget]
     text_view = handle[0]
     image_widget = handle[1]
+    turn_buttons = handle[2]
     
     if (output_type == wh.TEXT_MSG):
         # Get the text buffer from the text view
@@ -122,7 +123,15 @@ def process_output(handle, output_type, *msg):
     else:
         load_image(image_widget)
         image_widget.queue_draw()
+        turn_buttons[wh.game_turn()].set_active(True)
+        
 
+# Callback function to handle radio button press events - we control the turn order
+def on_button_press_event(radio_button, event):
+    if event.type == Gdk.EventType.BUTTON_PRESS and event.button == Gdk.BUTTON_PRIMARY:
+        # Override the toggle behavior programmatically
+        radio_button.set_active(radio_button.get_active())
+        return True  # Prevent the default toggle behavior
 
 def setup_gui():
     # Create the main window
@@ -197,12 +206,34 @@ def setup_gui():
     frame2.add(image_scrolled_window)
 
     # Add the scrolled window to the grid
-    grid.attach(frame2, 1, 0, 7, 2)
+    grid.attach(frame2, 1, 0, 7, 1)
+    
+    # Create panel for the turn track - as radio buttons
+    panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+    
+    # Create an array to hold the buttons
+    turn_buttons = []
+
+    # Create and add buttons
+    for i in range(16):
+        if (i == 0):
+            button = Gtk.RadioButton.new_with_label_from_widget(None, f"{i}")
+            button.set_active(True)
+        else:
+            button = Gtk.RadioButton.new_with_label_from_widget(turn_buttons[0], f"{i}")
+            button.set_active(False)
+        #button.set_sensitive(False)
+        button.connect("button-press-event", on_button_press_event)
+        turn_buttons.append(button)
+        panel.pack_start(button, True, True, 0)
+        
+    grid.attach(panel, 1, 1, 7, 1)
 
     # Pressing enter in the entry widget triggers the process_command() function
     entry.connect("activate", lambda widget: process_command(entry, text_view))
 
-    wh.register_output_reporter(process_output, [text_view, image_widget])    
+    # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
+    wh.register_output_reporter(process_output, [text_view, image_widget, turn_buttons])    
     wh.welcome()
 
     # Show all the widgets and start the GTK+ main loop

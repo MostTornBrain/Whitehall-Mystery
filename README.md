@@ -28,7 +28,7 @@ The current investigator locations are "poisoned" with a high weight on the edge
 
 Boats paths and alleys are also part of the di-graph, but are given higher weights (i.e. costs) to encourage Jack to only use them if there is a large benefit in distance gained.
 
-If Jack is trapped, or if the investigators are very close to him, he will also consider using an alley or a coach.  Per the rules, a coach cannot be used to reach the target, so the implementation attempts to take this into account as well.
+If Jack is trapped, or if the investigators are very close to him, he will also consider using an alley or a coach.  Per the rules, a coach or alley cannot be used to reach the target, so the implementation attempts to take this into account as well.
 
 ## Future work
 

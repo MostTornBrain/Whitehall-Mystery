@@ -311,10 +311,10 @@ class Jack:
         for num in range (0, 3):
             # Find the vertex belonging to the `num` inspector
             v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-            # follow paths up to 3 away and adjust them all
-            self.discourage_recursion(v, adjust, 3)
+            # follow paths up to 5 away and adjust them all
+            self.discourage_recursion(v, v, adjust, 5)
 
-    def discourage_recursion(self, v, adjust, depth):
+    def discourage_recursion(self, v, prior, adjust, depth):
         depth = depth - 1
         # Add a weight to all the edges one vertex away from v, following only routes an investigator can take, otherwise alleys cause an exponential increasing of deterrents
         for out_edge in v.out_edges():
@@ -322,8 +322,10 @@ class Jack:
                 n = out_edge.target()
                 for e in n.all_edges():
                     self.graph.ep.weight[e] += adjust
+                    #print("Edge : ", self.graph.vp.ids[e.source()], self.graph.vp.ids[e.target()], self.graph.ep.weight[e])
                 if depth > 0:
-                    self.discourage_recursion(n, adjust, depth)
+                    if not (n == prior):
+                        self.discourage_recursion(n, v, adjust, depth)
 
     def status(self):
         self.print()
@@ -423,7 +425,7 @@ class Jack:
         self.set_travel_weight(ALLEY_MOVE, POISON)
         
         # decide on a path
-        deterrents = [2, 1, 0.5, 0.25, 0]
+        deterrents = [1, 0.5, 0.25, 0]
         for deterrent in deterrents:
             v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
             v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
@@ -455,13 +457,23 @@ class Jack:
         self.poison_investigators(POISON)
         self.discourage_investigators(deterrent)
         self.consider_desperate_weights(True)
-            
-        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
-    
-        vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-        self.godmode_print([self.graph.vp.ids[v] for v in vlist])
 
+        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        
+        # Consider all the targets and return the easiest to reach
+        shortest_path = 1000000
+        for target in self.targets:
+            v2 = gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]
+            path_weight = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+            self.godmode_print("   Weight to get to ", target, " is ", path_weight)
+            if (path_weight < shortest_path):
+                self.active_target = target
+                shortest_path = path_weight
+        
+        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+        vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+        self.godmode_print("Considering: ", [self.graph.vp.ids[v] for v in vlist])
+        
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
         if gt.shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= POISON:
@@ -543,10 +555,11 @@ class Jack:
         
         # Each turn reconsider what is the best target to try
         # Do this before poisoning the routes
-        self.choose_closest_target()
+        # NOTE: pick_a_path() does this now (as an experimental test)
+        #self.choose_closest_target()
         
         # decide on a path
-        deterrents = [2, 1, 0.5, 0.25, 0]
+        deterrents = [1, 0.5, 0.25, 0]
         for deterrent in deterrents:
             vlist, cost, move_type = self.pick_a_path(deterrent)
             if not self.game_in_progress:

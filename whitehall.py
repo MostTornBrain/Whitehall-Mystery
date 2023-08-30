@@ -243,7 +243,10 @@ def register_output_reporter(func, handle):
     jack.register_output_reporter(func, handle)
 
 def game_turn():
-    return jack.turn_count()-1
+    turn = jack.turn_count()-1
+    if turn < 0:
+        turn = 0
+    return turn
 
 #command_line_ui()
 

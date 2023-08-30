@@ -299,12 +299,29 @@ class Jack:
         return self.graph.vp.ids[vlist[index]]
 
     # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
+    # NOTE: This assumes this called alternatively with a positive then a negative value
+    #       It saves the list of poisoned locations, then the next call uses that list for the unpoisoning
     def poison_investigators(self, adjust):
-        for num in range (0, 3):
-            v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+        if not hasattr(self, "is_poison"):
+            self.is_poison = []
+
+        if len(self.is_poison) == 0:
+            for num in range (0, 3):
+                # Only poison if the investigator is a distance of < 2 away
+                if self.hop_count(self.ipos[num], self.pos) < 2:
+                    self.is_poison.append(num)
+                    self.godmode_print("Investigator #", num, "is poison.")
+                    v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         
-            for e in v.all_edges():
-                self.graph.ep.weight[e] += adjust
+                    for e in v.all_edges():
+                        self.graph.ep.weight[e] += adjust
+        else:
+            for num in self.is_poison:
+                v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+        
+                for e in v.all_edges():
+                    self.graph.ep.weight[e] += adjust
+            self.is_poison = [] # Discard the entries so next time this is called, we start over
 
     # Discourage Jack from taking paths near investigators by increasing the weights
     def discourage_investigators(self, adjust):
@@ -445,8 +462,11 @@ class Jack:
                 self.godmode_print("   Jack finds this coach cost acceptable.")
                 break;
         
-        self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
-        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+        # Restore the weights if Jack still has cards for the move type
+        if (len(self.boat_cards) < 2):
+            self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
+        if (len(self.alley_cards) < 2):
+            self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         return vlist
 
     def pick_a_path_helper(self, deterrent):

@@ -26,6 +26,10 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf, Pango, Gdk
 import whitehall as wh
 import re
+import random
+
+COACH_MOVE=3
+travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 
 def add_text_with_tags(text_view, text):
     buffer = text_view.get_buffer()
@@ -120,11 +124,24 @@ def process_output(handle, output_type, *msg):
         # Scroll to the end of the text view
         text_view.scroll_to_iter(buffer.get_end_iter(), 0.0, True, 0.0, 0.0)
         
+    elif (output_type == wh.SPECIAL_TRAVEL_MSG):
+        overlay = turn_buttons[wh.game_turn()+1]
+        travel_type = msg[0]
+        image = Gtk.Image.new_from_file(travel_images[travel_type])
+        overlay.add_overlay(image)
+        overlay.show_all()
+        
+        # need a second image to cover the second turn the coach took
+        if travel_type == COACH_MOVE:
+            overlay = turn_buttons[wh.game_turn()+2]
+            image = Gtk.Image.new_from_file(travel_images[travel_type])
+            overlay.add_overlay(image)
+            overlay.show_all()
+        
     else:
         load_image(image_widget)
         image_widget.queue_draw()
-        turn_buttons[wh.game_turn()].set_active(True)
-        
+        turn_buttons[wh.game_turn()].get_child().set_active(True)
 
 # Callback function to handle radio button press events - we control the turn order
 def on_button_press_event(radio_button, event):
@@ -133,6 +150,26 @@ def on_button_press_event(radio_button, event):
         radio_button.set_active(radio_button.get_active())
         return True  # Prevent the default toggle behavior
 
+def resize_image(widget):
+    print(turn_buttons)
+    # Calculate the scaled height based on the width and aspect ratio
+    original_width = image.get_pixbuf().get_width()
+    original_height = image.get_pixbuf().get_height()
+    scaled_width = radio_button.get_allocated_width()
+    scaled_height = int(original_height * (scaled_width / original_width))
+
+    # Scale the image to match the width and proportional height
+    scaled_pixbuf = image.get_pixbuf().scale_simple(
+        scaled_width,
+        scaled_height,
+        GdkPixbuf.InterpType.BILINEAR
+    )
+    scaled_image = Gtk.Image.new_from_pixbuf(scaled_pixbuf)
+    overlay.add_overlay(scaled_image)
+
+# Create an array to hold the buttons
+turn_buttons = []
+  
 def setup_gui():
     # Create the main window
     window = Gtk.Window()
@@ -147,7 +184,7 @@ def setup_gui():
 
     # Create a frame to contain the text widget
     frame = Gtk.Frame()
-    frame.set_hexpand(True)
+    #frame.set_hexpand(True)
     frame.set_vexpand(True)
     
     # Set padding around the frame
@@ -156,6 +193,7 @@ def setup_gui():
     frame.set_margin_start(5)
     frame.set_margin_end(5)
     
+    GRID_HEIGHT = 3
     grid.attach(frame, 0, 0, 1, 1)
 
     # Create a text view for displaying input and output history
@@ -186,9 +224,10 @@ def setup_gui():
     # Create a box to hold the entry and button
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
     box.pack_start(entry, True, True, 0)
-
+    box.set_size_request(-1, 35)
+    
     # Add the box and other widgets to the grid
-    grid.attach(box, 0, 1, 1, 1)
+    grid.attach(box, 0, 2, 1, 1)
 
     image_widget = Gtk.Image()
     
@@ -206,28 +245,42 @@ def setup_gui():
     frame2.add(image_scrolled_window)
 
     # Add the scrolled window to the grid
-    grid.attach(frame2, 1, 0, 7, 1)
+    grid.attach(frame2, 1, 0, 2, GRID_HEIGHT)
     
     # Create panel for the turn track - as radio buttons
     panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+    panel.set_size_request(-1, 70)
     
-    # Create an array to hold the buttons
-    turn_buttons = []
-
     # Create and add buttons
     for i in range(16):
+        # Create an overlay for each button so we can display a special travel image when needed
+        overlay = Gtk.Overlay()
+        panel.pack_start(overlay, True, True, 0)
+        
         if (i == 0):
             button = Gtk.RadioButton.new_with_label_from_widget(None, f"{i}")
             button.set_active(True)
         else:
-            button = Gtk.RadioButton.new_with_label_from_widget(turn_buttons[0], f"{i}")
+            button = Gtk.RadioButton.new_with_label_from_widget(turn_buttons[0].get_child(), f"{i}")
             button.set_active(False)
-        #button.set_sensitive(False)
+
+        overlay.add(button)
         button.connect("button-press-event", on_button_press_event)
-        turn_buttons.append(button)
-        panel.pack_start(button, True, True, 0)
+        turn_buttons.append(overlay)
         
-    grid.attach(panel, 1, 1, 7, 1)
+        '''
+        travel_type = 1
+        image = Gtk.Image.new_from_file(travel_images[travel_type])
+        print(travel_images[travel_type])
+        overlay.add_overlay(image)
+        overlay.set_overlay_pass_through(overlay.get_child(), False)
+        print(overlay)
+        children = overlay.get_children()
+        print(children)
+        print (overlay.get_child)
+        '''
+        
+    grid.attach(panel, 0, GRID_HEIGHT, 3, 2)
 
     # Pressing enter in the entry widget triggers the process_command() function
     entry.connect("activate", lambda widget: process_command(entry, text_view))
@@ -235,6 +288,9 @@ def setup_gui():
     # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
     wh.register_output_reporter(process_output, [text_view, image_widget, turn_buttons])    
     wh.welcome()
+
+    # Connect the resize_image function to the "realize" signal of the window
+    #window.connect("realize", resize_image)
 
     # Show all the widgets and start the GTK+ main loop
     window.show_all()

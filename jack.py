@@ -26,6 +26,9 @@ import graph_tool.all as gt
 from graph_data import *
 import random
 
+# How many extra turns should Jack leave as "buffer" for completing his path
+TURN_BUFFER = 2
+
 NORMAL_MOVE = 0
 BOAT_MOVE = 1
 ALLEY_MOVE = 2
@@ -37,6 +40,7 @@ POISON = 1000
 
 TEXT_MSG=0
 IMG_REFRESH=1
+SPECIAL_TRAVEL_MSG=2
 
 JACK_MOVE_COLOR = "#e6988f"
 WATER_COLOR = "#5eb2fb"
@@ -113,6 +117,10 @@ class Jack:
     def gui_refresh(self):
         if (self.output_func is not None):
             self.output_func(self.output_handle, IMG_REFRESH)
+            
+    def notify_gui_of_special_travel(self, travel_type):
+        if (self.output_func is not None):
+            self.output_func(self.output_handle, SPECIAL_TRAVEL_MSG, travel_type)
         
         
     def make_image(self, scale=2):
@@ -584,7 +592,7 @@ class Jack:
             vlist, cost, move_type = self.pick_a_path(deterrent)
             if not self.game_in_progress:
                 return
-            if (cost <= (16 - self.turn_count())):
+            if (cost <= ((16 - TURN_BUFFER) - self.turn_count())):
                 self.godmode_print("   Jack finds this cost acceptable.")
                 break;
         
@@ -592,6 +600,8 @@ class Jack:
         if move_type == BOAT_MOVE:
             self.print("Jack took a boat on turn %d!" % len(self.path_used))
             self.boat_cards.append(self.turn_count())
+            self.notify_gui_of_special_travel(BOAT_MOVE)
+            
             if (len(self.boat_cards)>= 2):
                 # poison all the water paths - Jack has no boat cards left
                 self.set_travel_weight(BOAT_MOVE, POISON)
@@ -600,6 +610,8 @@ class Jack:
         elif move_type == ALLEY_MOVE:
             self.print("Jack snuck through an alley on turn %d!" % len(self.path_used))
             self.alley_cards.append(self.turn_count())
+            self.notify_gui_of_special_travel(ALLEY_MOVE)
+            
             if (len(self.alley_cards)>= 2):
                 # poison all the alley paths - Jack has no alley cards left
                 self.set_travel_weight(ALLEY_MOVE, POISON)
@@ -613,6 +625,7 @@ class Jack:
         # If we decide we should use a coach, revise the path since we can move through investigators
         if (move_type == COACH_MOVE):
             vlist = self.pick_a_coach_path()
+            self.notify_gui_of_special_travel(COACH_MOVE)
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
             self.godmode_print([self.graph.vp.ids[v] for v in vlist])
         

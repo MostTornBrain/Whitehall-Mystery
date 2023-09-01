@@ -211,6 +211,9 @@ def process_input(user_input):
 
     elif jack.godmode and "cost" == command:
         parse_cost(parms)
+    
+    elif jack.godmode and "self_test" == command:
+        self_tests()
         
     elif "exit" == command:
         exit()
@@ -233,6 +236,7 @@ def process_input(user_input):
         jack.print(" \033[1mgodmode <on,off>\033[0m:    Toggle godmode")
         jack.godmode_print("  \033[1mjackpos <pos>\033[0m:    Move Jack to the specified location for debugging")
         jack.godmode_print("  \033[1mcost <pos1>, <pos2>\033[0m:    Show the distance between two vertices (for weight debugging)")
+        jack.godmode_print("  \033[1mself_test\033[0m:    Run some self-tests")
     else:
         jack.print("Unknown command.")
 
@@ -259,6 +263,10 @@ def welcome():
 def register_output_reporter(func):
     jack.register_output_reporter(func)
 
+def register_gui_self_test(func):
+    register_gui_self_test.gui_self_test_func = func
+register_gui_self_test.gui_self_test_func = None
+    
 def game_turn():
     turn = jack.turn_count()-1
     if turn < 0:
@@ -271,12 +279,18 @@ def game_turn():
 # building it correctly and restoring weights correctly
 ug.save("my_graph_after.graphml")
 
-'''
-# Sanity check the map.  Make sure every edge is bi-directional.
-for edge in ug.edges():
-    source = edge.source()
-    target = edge.target()
-    edge_back = ug.edge(target, source)
-    if edge_back is None:
-        print("No edge back for ", ug.vp.ids[source], ug.vp.ids[target])
-'''
+def check_edges():
+    # Sanity check the map.  Make sure every edge is bi-directional.
+    for edge in ug.edges():
+        source = edge.source()
+        target = edge.target()
+        edge_back = ug.edge(target, source)
+        if edge_back is None:
+            print("No edge back for ", ug.vp.ids[source], ug.vp.ids[target])
+
+def self_tests():
+    check_edges()
+    if register_gui_self_test.gui_self_test_func is not None:
+        register_gui_self_test.gui_self_test_func()
+    jack.print("Self test complete.")
+    jack.print("Check shell console for any logged messages.")

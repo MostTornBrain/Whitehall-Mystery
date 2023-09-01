@@ -298,6 +298,7 @@ class WhiteHallGui:
         self.entry.connect("activate", self.process_command)
 
         # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
+        wh.register_gui_self_test(self.self_test)
         wh.register_output_reporter(self.process_output)    
         wh.welcome()
         self.refresh_turn_track()
@@ -309,5 +310,9 @@ class WhiteHallGui:
         self.window.show_all()
         Gtk.main()
 
+    def self_test(self):
+        print("GUI self tests completed.")
+        
 gui = WhiteHallGui()
 gui.setup()
+

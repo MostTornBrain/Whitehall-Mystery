@@ -33,6 +33,8 @@ vsize = ug.new_vp("int")
 vfsize = ug.new_vp("int")
 ecolor = ug.new_edge_property("string")
 
+investigators = ["y", "b", "r"]
+
 # Assign the x-y coordinates of everything
 vpos = ug.new_vp("vector<double>")
 for pair in positions:
@@ -86,7 +88,7 @@ def parse_ipos(user_input):
         for value in values:
             if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
                 values = []
-                jack.print(value, " is not a valid inspector location.")
+                jack.print(value, " is not a valid investigator location.")
                 break;
     return values;
 
@@ -110,6 +112,15 @@ def parse_single_location(user_input):
         value.strip()
         if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
             jack.print(value, " is not a valid location.")
+            value = "BAD"
+    return value
+
+def parse_single_crossing(user_input):
+    if user_input:
+        value = user_input
+        value.strip()
+        if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            jack.print(value, " is not a valid crossing.")
             value = "BAD"
     return value
 
@@ -141,13 +152,13 @@ def process_input(user_input):
     command = split_input[0]
     parms = split_input[-1]   # Note: this can end up being the same as command if no arguments were supplied
     
-    if command == "jack":
+    if "jack" == command:
         jack.move()
         
-    elif command == "start":
+    elif "start" == command:
         jack.reset()
         
-    elif command == "godmode":
+    elif "godmode" == command:
         if parms == "on":
             jack.godmode = True
             jack.print("Godmode is now on.")
@@ -157,29 +168,41 @@ def process_input(user_input):
         else:
             jack.print("Usage: godmode <on,off>")
         
-    elif command == "ipos":
+    elif "ipos" == command:
         values = parse_ipos(parms)
         if (len(values) == 3):
             jack.set_ipos(values)
         else:
             jack.print("Usage: ipos <pos1>, <pos2>, <pos3>")
             
-    elif command == "status":
+    elif "status" == command:
         jack.status()
 
-    elif command == "img":
+    elif "map" == command:
         jack.make_image()
         
-    elif command == "arrest":
+    elif "arrest" == command:
         pos = parse_single_location(parms)
         if (pos != "BAD"):
             jack.arrest(pos)
         
-    elif "clues" in user_input:
+    elif "clues" == command:
         pos_list = parse_clues(parms)
         if (len(pos_list) != 0):
             jack.clue_search(pos_list)
-        
+
+    elif command in investigators:
+        pos = parse_single_crossing(parms)
+        if (pos != "BAD"):
+            i = investigators.index(command)
+            # I could just modify jack.ipos directly, but we use the API to ensure the map gets redrawn
+            ipos = jack.ipos
+            if pos in ipos and ipos.index(pos) != i:
+                jack.print("Cannot move investigator to an already occupied space.")
+            else:
+                ipos[i] = pos
+                jack.set_ipos(ipos)
+    
     elif jack.godmode and "jackpos" == command:
         pos = parse_single_location(parms)
         if (pos != "BAD"):
@@ -189,18 +212,23 @@ def process_input(user_input):
     elif jack.godmode and "cost" == command:
         parse_cost(parms)
         
-    elif "exit" in user_input:
+    elif "exit" == command:
         exit()
             
-    elif "help" in user_input:
+    elif "help" == command:
         jack.print("Commands are:")
         jack.print(" \033[1mjack\033[0m:    Jack takes his turn")
         jack.print(" \033[1mstart\033[0m:   Start a new game (CAUTION: typing this mid-game will RESTART the game)")
-        jack.print(" \033[1mipos <pos1>, <pos2>, <pos3>\033[0m:  Enter the inspector locations")
+        
+        jack.print(" \033[1mipos <pos1>, <pos2>, <pos3>\033[0m:  Enter the investigator locations")
+        jack.print(" \033[1my <pos1>\033[0m:  Move the yellow investigator")
+        jack.print(" \033[1mb <pos1>\033[0m:  Move the blue investigator")
+        jack.print(" \033[1mr <pos1>\033[0m:  Move the red investigator")
+        
         jack.print(" \033[1mstatus\033[0m:    View the current game status")
         jack.print(" \033[1marrest <pos>\033[0m:    Attempt arrest at the specified position")
         jack.print(" \033[1mclues <pos1>,..,<posX>\033[0m:    Search for clues at the supplied locations in the specified order")
-        jack.print(" \033[1mimg\033[0m:    Force the img file to be updated immediately with the current game state")
+        jack.print(" \033[1mmap\033[0m:    Force the map file to be updated immediately with the current game state")
         jack.print(" \033[1mexit\033[0m:    Completely exit the program.")
         jack.print(" \033[1mgodmode <on,off>\033[0m:    Toggle godmode")
         jack.godmode_print("  \033[1mjackpos <pos>\033[0m:    Move Jack to the specified location for debugging")

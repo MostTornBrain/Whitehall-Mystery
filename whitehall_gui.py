@@ -99,6 +99,28 @@ def load_image(image_widget):
     image_widget.clear()
     image_widget.set_from_pixbuf(scaled_pixbuf)
 
+
+def refresh_turn_track(turn_buttons, image_widget):
+    curr_turn = wh.game_turn()
+    load_image(image_widget)
+    image_widget.queue_draw()
+    turn_buttons[curr_turn].get_child().set_active(True)
+
+    # Move the jack token to the current turn space
+    curr_overlay = turn_buttons[curr_turn]        
+    if (process_output.jack_token_pos == -1):
+        image = Gtk.Image.new_from_file("jack-corner.png")
+        curr_overlay.add_overlay(image)
+    elif (process_output.jack_token_pos != curr_turn):
+        prev_overlay = turn_buttons[process_output.jack_token_pos]
+        jack_widget = prev_overlay.get_children()[-1]
+        prev_overlay.remove(jack_widget)
+        curr_overlay.add_overlay(jack_widget)
+
+    curr_overlay.show_all()
+    process_output.jack_token_pos = curr_turn
+    
+
 def process_output(handle, output_type, *msg):
     # handle = [text_view, image_widget]
     text_view = handle[0]
@@ -166,25 +188,8 @@ def process_output(handle, output_type, *msg):
             
 
     else:
-        curr_turn = wh.game_turn()
-        load_image(image_widget)
-        image_widget.queue_draw()
-        turn_buttons[curr_turn].get_child().set_active(True)
-
-        # Move the jack token to the current turn space
-        curr_overlay = turn_buttons[curr_turn]        
-        if (process_output.jack_token_pos == -1):
-            image = Gtk.Image.new_from_file("jack-corner.png")
-            curr_overlay.add_overlay(image)
-        elif (process_output.jack_token_pos != curr_turn):
-            prev_overlay = turn_buttons[process_output.jack_token_pos]
-            jack_widget = prev_overlay.get_children()[-1]
-            prev_overlay.remove(jack_widget)
-            curr_overlay.add_overlay(jack_widget)
-
-        curr_overlay.show_all()
-        process_output.jack_token_pos = curr_turn
-
+        refresh_turn_track(turn_buttons, image_widget)
+        
 # Callback function to handle radio button press events - we control the turn order
 def on_button_press_event(radio_button, event):
     if event.type == Gdk.EventType.BUTTON_PRESS and event.button == Gdk.BUTTON_PRIMARY:
@@ -331,7 +336,8 @@ def setup_gui():
     # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
     wh.register_output_reporter(process_output, [text_view, image_widget, turn_buttons])    
     wh.welcome()
-
+    refresh_turn_track(turn_buttons, image_widget)
+    
     # Connect the resize_image function to the "realize" signal of the window
     #window.connect("realize", resize_image)
 

@@ -106,23 +106,22 @@ class Jack:
         
         self.path_used = []
         
-    def register_output_reporter(self, func, handle):
+    def register_output_reporter(self, func):
         self.output_func = func
-        self.output_handle = handle
         
     def print(self, *msg):
         if (self.output_func == None):
             print(*msg)
         else:
-            self.output_func(self.output_handle, TEXT_MSG, *msg)
+            self.output_func(TEXT_MSG, *msg)
             
     def gui_refresh(self):
         if (self.output_func is not None):
-            self.output_func(self.output_handle, IMG_REFRESH)
+            self.output_func(IMG_REFRESH)
             
     def notify_gui_of_special_travel(self, travel_type):
         if (self.output_func is not None):
-            self.output_func(self.output_handle, SPECIAL_TRAVEL_MSG, travel_type)
+            self.output_func(SPECIAL_TRAVEL_MSG, travel_type)
         
         
     def make_image(self, scale=2):
@@ -576,7 +575,7 @@ class Jack:
             self.targets.remove(self.pos)
             self.clues = []
             if self.output_func != None:
-                self.output_func(self.output_handle, NEW_ROUND_MSG, None)
+                self.output_func(NEW_ROUND_MSG, None)
 
         if (len(self.targets) == 0):
             self.print("Game over!  Jack won!")

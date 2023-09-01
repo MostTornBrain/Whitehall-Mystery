@@ -256,8 +256,8 @@ def welcome():
     jack.print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
     jack.print("   Then type \033[1mstart\033[0m to begin the game.")
 
-def register_output_reporter(func, handle):
-    jack.register_output_reporter(func, handle)
+def register_output_reporter(func):
+    jack.register_output_reporter(func)
 
 def game_turn():
     turn = jack.turn_count()-1

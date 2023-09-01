@@ -17,7 +17,7 @@ Type `help` at the prompt to get a full list of commands.
 
 To the best of my knowledge Jack always plays by the rules.  If you notice incorrect behavior for Jack, please let me know.
 
-If you want to see in detail what Jack is doing, you can enable "godmode" which is helpful for debugging and other diagnostics. When in godmode, you can move Jack to an arbitrary location to test behavior. **Enabling godmode will completely spoil the challenge of the active game. You will see Jack's path on the map as well as a trascription of where he is heading.** Use godmode only if you are curious how the Jack behavior works or are debugging the code.
+If you want to see in detail what Jack is doing, you can enable "godmode" which is helpful for debugging and other diagnostics. When in godmode, you can move Jack to an arbitrary location to test behavior. **Enabling godmode will completely spoil the challenge of the active game. You will see Jack's path on the map as well as a transcription of where he is heading.** Use godmode only if you are curious how the Jack behavior works or are debugging the code.
 
 ## Theory of operation
 A di-graph was needed so a weight can be assigned to ingress edges to a location, but not to outbound edges.  This allows path distance calculation to ignore the cost of crossings, since Jack goes from location to location.  However, it also will allow the graph to be updated with weights in crossings based on the players' positions so when a "best" path is chosen, investigators can be avoided.   Similarly, weights can be assigned to water crossings and alleys to influence how likely Jack will be to use them.

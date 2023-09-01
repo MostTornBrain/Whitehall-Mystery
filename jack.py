@@ -89,6 +89,7 @@ class Jack:
         self.ipos = ipos
         self.godmode = False
         self.win = None
+        self.pos = 0
         
         self.game_in_progress = False
         

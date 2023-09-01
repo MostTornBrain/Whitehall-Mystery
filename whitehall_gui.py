@@ -323,18 +323,6 @@ def setup_gui():
         button.connect("button-press-event", on_button_press_event)
         turn_buttons.append(overlay)
         
-        '''
-        travel_type = 1
-        image = Gtk.Image.new_from_file(travel_images[travel_type])
-        print(travel_images[travel_type])
-        overlay.add_overlay(image)
-        overlay.set_overlay_pass_through(overlay.get_child(), False)
-        print(overlay)
-        children = overlay.get_children()
-        print(children)
-        print (overlay.get_child)
-        '''
-        
     grid.attach(panel, 0, GRID_HEIGHT, 3, 2)
 
     # Pressing enter in the entry widget triggers the process_command() function

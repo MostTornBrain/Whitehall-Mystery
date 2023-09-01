@@ -25,10 +25,6 @@ import graph_tool.all as gt
 from jack import *
 import re
 
-LAND = 0
-WATER = 1
-ALLEY = 2
-
 ug = gt.Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
@@ -51,7 +47,7 @@ for node in ug.vertices():
 
 # We don't want the water or alley paths (edges) to be visible
 for edge in ug.edges():
-    if (ug.ep.transport[edge] == WATER) or (ug.ep.transport[edge] == ALLEY):
+    if (ug.ep.transport[edge] == BOAT_MOVE) or (ug.ep.transport[edge] == ALLEY_MOVE):
         ecolor[edge] = "#ffffff"
     else:
         ecolor[edge] = "#000000"
@@ -81,12 +77,11 @@ jack.make_image()
 ##########################################
 
 def parse_ipos(user_input):
-    # Use regular expression to match the alphanumeric values
-    match = re.search(r'ipos\s(.+)', user_input)
+    match = user_input
     values = []
     # Extract the alphanumeric values
     if match:
-        values = match.group(1).split(',')
+        values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
             if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
@@ -96,12 +91,11 @@ def parse_ipos(user_input):
     return values;
 
 def parse_clues(user_input):
-    # Use regular expression to match the alphanumeric values
-    match = re.search(r'clues\s(.+)', user_input)
+    match = user_input
     values = []
     # Extract the alphanumeric values
     if match:
-        values = match.group(1).split(',')
+        values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
             if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
@@ -110,24 +104,9 @@ def parse_clues(user_input):
                 break;
     return values;
 
-def parse_arrest(user_input):
-    # Use regular expression to match the alphanumeric values
-    match = re.search(r'arrest\s(.+)', user_input)
-    # Extract the alphanumeric values
-    if match:
-        value = match.group(1)
-        value.strip()
-        if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
-            jack.print(value, " is not a valid location.")
-            value = "BAD"
-    return value
-
-def parse_jackpos(user_input):
-    # Use regular expression to match the alphanumeric values
-    match = re.search(r'jackpos\s(.+)', user_input)
-    # Extract the alphanumeric values
-    if match:
-        value = match.group(1)
+def parse_single_location(user_input):
+    if user_input:
+        value = user_input
         value.strip()
         if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
             jack.print(value, " is not a valid location.")
@@ -136,69 +115,79 @@ def parse_jackpos(user_input):
 
 def parse_cost(user_input):
     # Use regular expression to match the alphanumeric values
-    match = re.search(r'cost\s(.+)', user_input)
+    match = user_input
     values = []
     # Extract the alphanumeric values
     if match:
-        values = match.group(1).split(',')
+        values = match.split(',')
         values = [value.strip() for value in values]
         if (len(values) != 2):
-            jack.print("Must enter two locations")
+            jack.print("Must enter two (and only two) locations")
             return
         for value in values:
             if len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
                 values = []
                 jack.print(value, " is not a valid location.")
                 return
-        print (jack.hop_count(values[0], values[1]))
+        jack.print(jack.hop_count(values[0], values[1]))
                 
                 
                 
 def process_input(user_input):
     # NOTE: This does only very rudimentary syntax checking. It is NOT a feature-rich UI
     #       For example, it does simple substring matching for some commands.
-    if user_input == "jack":
+    
+    split_input = user_input.split(" ", 1)
+    command = split_input[0]
+    parms = split_input[-1]   # Note: this can end up being the same as command if no arguments were supplied
+    
+    if command == "jack":
         jack.move()
         
-    elif user_input == "start":
+    elif command == "start":
         jack.reset()
         
-    elif user_input == "godmode on":
-        jack.godmode = True
+    elif command == "godmode":
+        if parms == "on":
+            jack.godmode = True
+            jack.print("Godmode is now on.")
+        elif parms == "off":
+            jack.godmode = False
+            jack.print("Godmode is now off.")
+        else:
+            jack.print("Usage: godmode <on,off>")
         
-    elif user_input == "godmode off":
-        jack.godmode = False
-        
-    elif "ipos" in user_input:
-        values = parse_ipos(user_input)
+    elif command == "ipos":
+        values = parse_ipos(parms)
         if (len(values) == 3):
             jack.set_ipos(values)
         else:
-            jack.print("Invalid input")
+            jack.print("Usage: ipos <pos1>, <pos2>, <pos3>")
             
-    elif user_input == "status":
+    elif command == "status":
         jack.status()
 
-    elif user_input == "img":
+    elif command == "img":
         jack.make_image()
         
-    elif "arrest" in user_input:
-        pos = parse_arrest(user_input)
+    elif command == "arrest":
+        pos = parse_single_location(parms)
         if (pos != "BAD"):
             jack.arrest(pos)
         
     elif "clues" in user_input:
-        pos_list = parse_clues(user_input)
+        pos_list = parse_clues(parms)
         if (len(pos_list) != 0):
             jack.clue_search(pos_list)
         
-    elif jack.godmode and "jackpos" in user_input:
-        pos = parse_jackpos(user_input)
+    elif jack.godmode and "jackpos" == command:
+        pos = parse_single_location(parms)
         if (pos != "BAD"):
             jack.pos = pos
+            jack.make_image()
 
-    elif jack.godmode and "cost" in user_input:
-        parse_cost(user_input)
+    elif jack.godmode and "cost" == command:
+        parse_cost(parms)
         
     elif "exit" in user_input:
         exit()

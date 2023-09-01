@@ -65,10 +65,7 @@ def process_command(entry, text_view):
 
     # Append the command to the text view with bold formatting
     buffer.insert_with_tags_by_name(buffer.get_end_iter(), f"> {command}\n", "bold")
-
-    # Scroll to the end of the text view
-    text_view.scroll_to_iter(buffer.get_end_iter(), 0.0, True, 0.0, 0.0)
-
+    
     # Perform actions based on the command
     wh.process_input(command)
 
@@ -89,7 +86,7 @@ def load_image(image_widget):
 
     image_widget.clear()
     image_widget.set_from_pixbuf(scaled_pixbuf)
-    
+
 def process_output(handle, output_type, *msg):
     # handle = [text_view, image_widget]
     text_view = handle[0]
@@ -121,9 +118,6 @@ def process_output(handle, output_type, *msg):
         '''
         m = ' '.join(str(arg) for arg in msg)
         add_text_with_tags(text_view, f"{m}\n")
-        
-        # Scroll to the end of the text view
-        text_view.scroll_to_iter(buffer.get_end_iter(), 0.0, True, 0.0, 0.0)
         
     elif (output_type == wh.SPECIAL_TRAVEL_MSG):
         overlay = turn_buttons[wh.game_turn()+1]
@@ -206,7 +200,13 @@ def resize_image(widget):
 
 # Create an array to hold the buttons
 turn_buttons = []
-  
+
+def _autoscroll(self, *args):
+    """The actual scrolling method"""
+    sw = self.get_parent()
+    adj = sw.get_vadjustment()
+    adj.set_value(adj.get_upper() - adj.get_page_size())
+
 def setup_gui():
     # Create the main window
     window = Gtk.Window()
@@ -238,6 +238,8 @@ def setup_gui():
     text_view.set_editable(False)
     text_view.set_wrap_mode(Gtk.WrapMode.WORD)
     text_view.set_cursor_visible(False)
+    
+    text_view.connect("size-allocate", _autoscroll)
     
     # Create a scrolled window to contain the text view
     scrolled_window = Gtk.ScrolledWindow()

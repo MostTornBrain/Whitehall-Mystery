@@ -28,7 +28,6 @@ import whitehall as wh
 import re
 import random
 
-COACH_MOVE=3
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 
 def add_text_with_tags(text_view, text):
@@ -96,7 +95,9 @@ def process_output(handle, output_type, *msg):
     text_view = handle[0]
     image_widget = handle[1]
     turn_buttons = handle[2]
-    
+    if not hasattr(process_output, "jack_token_pos"):
+        process_output.jack_token_pos = -1
+        
     if (output_type == wh.TEXT_MSG):
         # Get the text buffer from the text view
         buffer = text_view.get_buffer()
@@ -132,16 +133,51 @@ def process_output(handle, output_type, *msg):
         overlay.show_all()
         
         # need a second image to cover the second turn the coach took
-        if travel_type == COACH_MOVE:
+        if travel_type == wh.COACH_MOVE:
             overlay = turn_buttons[wh.game_turn()+2]
             image = Gtk.Image.new_from_file(travel_images[travel_type])
             overlay.add_overlay(image)
             overlay.show_all()
+            
+    elif (output_type == wh.NEW_ROUND_MSG):
+        if (process_output.jack_token_pos != -1):
+            # Temporarily remove the jack token so it isn't counted as an extra card overlay that needs to be removed.
+            jack_overlay = turn_buttons[process_output.jack_token_pos]
+            jack_widget = jack_overlay.get_children()[-1]
+            jack_overlay.remove(jack_widget)
         
+        # remove all special transportation cards from the turn track
+        for overlay in turn_buttons:
+            children = overlay.get_children()
+            # There will only ever be at most one extra overlay per turn space
+            if len(children) > 1:
+                overlay.remove(children[-1])
+        
+        # put the jack token back
+        if (process_output.jack_token_pos != -1):
+            jack_overlay.add_overlay(jack_widget)
+            jack_overlay.show_all()
+            
+
     else:
+        curr_turn = wh.game_turn()
         load_image(image_widget)
         image_widget.queue_draw()
-        turn_buttons[wh.game_turn()].get_child().set_active(True)
+        turn_buttons[curr_turn].get_child().set_active(True)
+
+        # Move the jack token to the current turn space
+        curr_overlay = turn_buttons[curr_turn]        
+        if (process_output.jack_token_pos == -1):
+            image = Gtk.Image.new_from_file("jack-corner.png")
+            curr_overlay.add_overlay(image)
+        elif (process_output.jack_token_pos != curr_turn):
+            prev_overlay = turn_buttons[process_output.jack_token_pos]
+            jack_widget = prev_overlay.get_children()[-1]
+            prev_overlay.remove(jack_widget)
+            curr_overlay.add_overlay(jack_widget)
+
+        curr_overlay.show_all()
+        process_output.jack_token_pos = curr_turn
 
 # Callback function to handle radio button press events - we control the turn order
 def on_button_press_event(radio_button, event):
@@ -150,6 +186,7 @@ def on_button_press_event(radio_button, event):
         radio_button.set_active(radio_button.get_active())
         return True  # Prevent the default toggle behavior
 
+# TODO: this isn't currently used
 def resize_image(widget):
     print(turn_buttons)
     # Calculate the scaled height based on the width and aspect ratio
@@ -263,6 +300,10 @@ def setup_gui():
         else:
             button = Gtk.RadioButton.new_with_label_from_widget(turn_buttons[0].get_child(), f"{i}")
             button.set_active(False)
+
+        # Set the alignment of the radio button
+        button.set_halign(Gtk.Align.CENTER)
+        button.set_valign(Gtk.Align.CENTER)
 
         overlay.add(button)
         button.connect("button-press-event", on_button_press_event)

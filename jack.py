@@ -41,6 +41,7 @@ POISON = 1000
 TEXT_MSG=0
 IMG_REFRESH=1
 SPECIAL_TRAVEL_MSG=2
+NEW_ROUND_MSG=3
 
 JACK_MOVE_COLOR = "#e6988f"
 WATER_COLOR = "#5eb2fb"
@@ -197,7 +198,7 @@ class Jack:
         self.godmode_print("Jack starts at " + self.pos + " and is " + 
                 str(self.hop_count(self.pos, self.active_target)) + 
                 " away.")
-                
+        
         # Perform Jack's first move of the game
         self.move()
 
@@ -573,6 +574,8 @@ class Jack:
             self.path_used = [self.pos]
             self.targets.remove(self.pos)
             self.clues = []
+            if self.output_func != None:
+                self.output_func(self.output_handle, NEW_ROUND_MSG, None)
 
         if (len(self.targets) == 0):
             self.print("Game over!  Jack won!")

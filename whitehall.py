@@ -270,3 +270,13 @@ def game_turn():
 # Save the graph so I can debug the contents to make sure I'm 
 # building it correctly and restoring weights correctly
 ug.save("my_graph_after.graphml")
+
+'''
+# Sanity check the map.  Make sure every edge is bi-directional.
+for edge in ug.edges():
+    source = edge.source()
+    target = edge.target()
+    edge_back = ug.edge(target, source)
+    if edge_back is None:
+        print("No edge back for ", ug.vp.ids[source], ug.vp.ids[target])
+'''

@@ -23,7 +23,7 @@ SOFTWARE.
 '''
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GdkPixbuf, Pango, Gdk
+from gi.repository import Gtk, GdkPixbuf, Pango, Gdk, GLib
 import whitehall as wh
 import re
 import random
@@ -44,12 +44,11 @@ def add_text_with_tags(text_view, text):
             buffer.insert(buffer.get_end_iter(), segment)
 
 
-def process_command(entry, text_view):
-    command = entry.get_text()
-
-    # Clear the entry widget
-    entry.set_text("")
-
+def process_command_helper(args):
+    command = args[0]
+    entry = args[1]
+    text_view = args[2]
+    
     # Get the text buffer from the text view
     buffer = text_view.get_buffer()
 
@@ -68,7 +67,20 @@ def process_command(entry, text_view):
     
     # Perform actions based on the command
     wh.process_input(command)
+    entry.set_text("")
+    entry.set_editable(True)
+    return False
+    
+def process_command(entry, text_view):
+    command = entry.get_text()
 
+    # Clear the entry widget
+    entry.set_text("Jack is thinking...")
+    entry.set_position(-1)
+    entry.set_editable(False)
+    GLib.idle_add(process_command_helper, [command, entry, text_view])
+    #GLib.timeout_add(1, process_command_helper, [command, entry, text_view])
+    
 def load_image(image_widget):
     # Load the bitmap image
     image_path = "jack.png"

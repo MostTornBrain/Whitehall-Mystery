@@ -27,15 +27,19 @@ from graph_data import *
 import random
 
 # How many extra turns should Jack leave as "buffer" for completing his path
-TURN_BUFFER = 2
+TURN_BUFFER = 3
+DEFAULT_WATER_WEIGHT = 3
+DEFAULT_ALLEY_WEIGHT = 20
+
+EASY = [0, 14]
+MEDIUM = [14, 17]
+HARD = [17, 1000]
 
 NORMAL_MOVE = 0
 BOAT_MOVE = 1
 ALLEY_MOVE = 2
 COACH_MOVE = 3
 
-DEFAULT_WATER_WEIGHT = 10
-DEFAULT_ALLEY_WEIGHT = 10
 POISON = 1000
 
 TEXT_MSG=0
@@ -170,6 +174,42 @@ class Jack:
         if (self.godmode):
             self.print(*msg)
 
+    def pick_the_targets(self, difficulty, self_test=False):
+        # Choose the 4 targets for the game
+        # TODO: base this on difficulty chosen
+        # TODO: initially report the challenge rating based on how well connected the locations are and how long the ideal path is to reach
+
+        done = False
+        min = 1000
+        max = 0
+        total = 0 
+        count = 0
+        while not done:
+            self.targets = []
+            for q in quads:
+                self.targets.append(random.choice(q))
+            
+            dist = self.hop_count(self.targets[0], self.targets[3])
+            dist += self.hop_count(self.targets[1], self.targets[2])
+            self.godmode_print("Distance rating is:", dist)
+            
+            if (not(self_test)) and (dist >= difficulty[0]) and (dist < difficulty[1]):
+                done = True
+            
+            if (self_test):
+                if dist < min:
+                    min = dist
+                if dist > max:
+                    max = dist
+                total += dist
+                count += 1
+                if count > 500:
+                    done = True
+        if self_test:
+            print("Min:", min)
+            print("Max:", max)
+            print("Avg:", total/count)
+        
     def reset(self):
         self.game_in_progress = True
         self.targets = []
@@ -186,8 +226,7 @@ class Jack:
         self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
         self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         
-        for q in quads:
-            self.targets.append(random.choice(q))
+        self.pick_the_targets(EASY)
         
         self.godmode_print("Jack shall visit ", self.targets)
         
@@ -478,6 +517,28 @@ class Jack:
             self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         return vlist
 
+    def normal_move_possible(self, src, dest):
+        ret = False
+        self.poison_investigators(POISON)
+        self.set_travel_weight(BOAT_MOVE, POISON)
+        self.set_travel_weight(ALLEY_MOVE, POISON)
+        
+        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, src)[0]
+        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, dest)[0]
+        path_weight = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+        self.godmode_print("      Alley thoughts: count to get to ", dest, "is", path_weight)
+        if (path_weight == 1):
+            ret = True
+
+        self.poison_investigators(-POISON)            
+        # Restore the weights if Jack still has cards for the move type
+        if (len(self.boat_cards) < 2):
+            self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
+        if (len(self.alley_cards) < 2):
+            self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+        
+        return ret
+        
     def pick_a_path_helper(self, deterrent):
         move_type = NORMAL_MOVE
 
@@ -529,7 +590,16 @@ class Jack:
         
         # Jack didn't pass through any crossings - must be using an alley
         elif 'c' not in self.graph.vp.ids[vlist[1]]:
-            move_type = ALLEY_MOVE
+            # Confirm Jack couldn't have gotten there in 1 turn using a normal move.
+            # If he could, don't waste an alley card
+            if not self.normal_move_possible(self.pos, self.graph.vp.ids[vlist[1]]):
+                move_type = ALLEY_MOVE
+            else:
+                self.godmode_print("Hmmm...   Jack thought to use an alley, but he can just walk there.")
+                self.godmode_print("   Randomly decide.")
+                # Randomly decide to use it so not totally predictable where he went when he uses an alley card.
+                if random.randint(1, 100) < 18:
+                    move_type = ALLEY_MOVE
     
         return [vlist, cost, move_type]
         

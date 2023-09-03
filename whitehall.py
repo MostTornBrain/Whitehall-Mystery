@@ -154,9 +154,11 @@ def process_input(user_input):
     
     if "jack" == command:
         jack.move()
+        process_input.player_move_allowed = True
         
     elif "start" == command:
         jack.reset()
+        process_input.player_move_allowed = True
         
     elif "godmode" == command:
         if parms == "on":
@@ -169,11 +171,14 @@ def process_input(user_input):
             jack.print("Usage: godmode <on,off>")
         
     elif "ipos" == command:
-        values = parse_ipos(parms)
-        if (len(values) == 3):
-            jack.set_ipos(values)
+        if (jack.godmode) or process_input.player_move_allowed:
+            values = parse_ipos(parms)
+            if (len(values) == 3):
+                jack.set_ipos(values)
+            else:
+                jack.print("Usage: ipos <pos1>, <pos2>, <pos3>")
         else:
-            jack.print("Usage: ipos <pos1>, <pos2>, <pos3>")
+            jack.print("It's Jack's turn to move now, not yours.")
             
     elif "status" == command:
         jack.status()
@@ -185,30 +190,38 @@ def process_input(user_input):
         pos = parse_single_location(parms)
         if (pos != "BAD"):
             jack.arrest(pos)
+            process_input.player_move_allowed = False
         
     elif "clues" == command:
         pos_list = parse_clues(parms)
         if (len(pos_list) != 0):
             jack.clue_search(pos_list)
+            process_input.player_move_allowed = False
 
     elif command in investigators:
-        pos = parse_single_crossing(parms)
-        if (pos != "BAD"):
-            i = investigators.index(command)
-            # I could just modify jack.ipos directly, but we use the API to ensure the map gets redrawn
-            ipos = jack.ipos
-            if pos in ipos and ipos.index(pos) != i:
-                jack.print("Cannot move investigator to an already occupied space.")
-            else:
-                ipos[i] = pos
-                jack.set_ipos(ipos)
+        if (jack.godmode) or process_input.player_move_allowed:
+            pos = parse_single_crossing(parms)
+            if (pos != "BAD"):
+                i = investigators.index(command)
+                # I could just modify jack.ipos directly, but we use the API to ensure the map gets redrawn
+                ipos = jack.ipos
+                if pos in ipos and ipos.index(pos) != i:
+                    jack.print("Cannot move investigator to an already occupied space.")
+                else:
+                    ipos[i] = pos
+                    jack.set_ipos(ipos)
+        else:
+            jack.print("It's Jack's turn to move now, not yours.")
     
     elif jack.godmode and "jackpos" == command:
         pos = parse_single_location(parms)
         if (pos != "BAD"):
             jack.pos = pos
             jack.make_image()
-
+            # TODO: just testing the algorithm - remove when done
+            print(jack.locations_one_away(pos))
+            print(jack.location_safety_rating(pos))
+            
     elif jack.godmode and "cost" == command:
         parse_cost(parms)
     
@@ -239,6 +252,8 @@ def process_input(user_input):
         jack.godmode_print("  \033[1mself_test\033[0m:    Run some self-tests")
     else:
         jack.print("Unknown command.")
+
+process_input.player_move_allowed = True
 
 def command_line_ui():
     # Input loop

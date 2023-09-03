@@ -31,9 +31,10 @@ TURN_BUFFER = 3
 DEFAULT_WATER_WEIGHT = 3
 DEFAULT_ALLEY_WEIGHT = 20
 
-EASY = [0, 14]
-MEDIUM = [14, 17]
-HARD = [17, 1000]
+# This difficulty rating is from JACK's point of view, not the players'
+EASY_BUCKET = 0
+MEDIUM_BUCKET = 1
+HARD_BUCKET = 2
 
 NORMAL_MOVE = 0
 BOAT_MOVE = 1
@@ -110,6 +111,45 @@ class Jack:
         
         self.path_used = []
         
+        # Rate all the potential target locations
+        self.rate_quads()
+        
+    def rate_quads(self):
+        self.rated_quads = []
+        for q in quads:
+            min = 1000
+            max = 0
+            total = 0 
+            count = 0
+            
+            # First pass: compute the range and average of the group
+            for t in q:
+                rating = self.location_safety_rating(t)
+                if rating < min:
+                    min = rating
+                if rating > max:
+                    max = rating
+                total += rating
+                count += 1
+            avg = total/count
+            
+            avg_span_low = round(avg - ((avg - min + 1)/3))
+            avg_span_high = round(avg + ((max - avg + 1)/3))
+            
+            # Second pass: put each into the proper graded bucket
+            quad_bucket = [[],[],[]]
+            for t in q:
+                rating = self.location_safety_rating(t)
+                if rating >= avg_span_high:
+                    quad_bucket[EASY_BUCKET].append(t)
+                elif rating > avg_span_low:
+                    quad_bucket[MEDIUM_BUCKET].append(t)
+                else:
+                    quad_bucket[HARD_BUCKET].append(t)
+            
+            self.rated_quads.append(quad_bucket)
+        
+
     def register_output_reporter(self, func):
         self.output_func = func
         
@@ -174,42 +214,11 @@ class Jack:
         if (self.godmode):
             self.print(*msg)
 
-    def pick_the_targets(self, difficulty, self_test=False):
+    def pick_the_targets(self, difficulty):
         # Choose the 4 targets for the game
-        # TODO: base this on difficulty chosen
-        # TODO: initially report the challenge rating based on how well connected the locations are and how long the ideal path is to reach
+        for q in self.rated_quads:
+            self.targets.append(random.choice(q[difficulty]))
 
-        done = False
-        min = 1000
-        max = 0
-        total = 0 
-        count = 0
-        while not done:
-            self.targets = []
-            for q in quads:
-                self.targets.append(random.choice(q))
-            
-            dist = self.hop_count(self.targets[0], self.targets[3])
-            dist += self.hop_count(self.targets[1], self.targets[2])
-            self.godmode_print("Distance rating is:", dist)
-            
-            if (not(self_test)) and (dist >= difficulty[0]) and (dist < difficulty[1]):
-                done = True
-            
-            if (self_test):
-                if dist < min:
-                    min = dist
-                if dist > max:
-                    max = dist
-                total += dist
-                count += 1
-                if count > 500:
-                    done = True
-        if self_test:
-            print("Min:", min)
-            print("Max:", max)
-            print("Avg:", total/count)
-        
     def reset(self):
         self.game_in_progress = True
         self.targets = []
@@ -226,7 +235,7 @@ class Jack:
         self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
         self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
         
-        self.pick_the_targets(EASY)
+        self.pick_the_targets(EASY_BUCKET)
         
         self.godmode_print("Jack shall visit ", self.targets)
         
@@ -277,13 +286,12 @@ class Jack:
         self.godmode_print("Jack chooses \033[1m", self.active_target, "\033[0m")
 
 
-    def choose_starting_target(self):            
-        candidates = []
-        farthest_dist  = 0
-        farthest_mean = 0
-        
-        '''   Temporarily disable target choosing
+    def choose_starting_target(self):
         # Built a list of targets that aren't aren't too close to the investigators
+        farthest_dist = 0
+        farthest_mean = 0
+        candidates = []
+        
         for target in self.targets:
             closest_dist = 100
             closest_mean = 0
@@ -319,10 +327,6 @@ class Jack:
         else:
             self.godmode_print("All the targets are close to an investigator. Choosing the farthest of all 4...")
             self.active_target = farthest_target
-        '''
-        
-        self.active_target = random.choice(self.targets)
-        self.godmode_print("Jack chooses ", self.active_target)
         
         
     def set_ipos(self, i):
@@ -431,15 +435,31 @@ class Jack:
         return len(self.path_used)
         
 
+    # Compute the safety rating of a location - HIGHER is SAFER
+    def location_safety_rating(self, pos):
+        one_away = self.locations_one_away(pos)
+        raw_pos = gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]
+        #calculate the out-degree but don't count boat or alley paths
+        out_degree = 0
+        for edge in raw_pos.out_edges():
+            if (self.graph.ep.transport[edge]) == NORMAL_MOVE:
+                out_degree += 1
+        return len(one_away) * out_degree
+
+    # Experimenting with Breadth-first-search to see if it is faster than my hackish find_adjacent_nongoal_vertex() (defined further down)
+    def locations_one_away(self, source):
+        pos = gt.find_vertex(self.graph, self.graph.vp.ids, source)[0]
+        dist_map = list(gt.shortest_distance(self.graph, pos, max_dist=1, weights=self.graph.ep.weight))
+        return [
+            self.graph.vp.ids[v] for v in self.graph.iter_vertices() if (dist_map[v] == 1 and 'c' not in self.graph.vp.ids[v])
+        ]
+    
+    
     def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach
         # Pick another vertex that is 1 space away and isn't where he was previously, since that is also against the rules
-        cur_pos = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-        # Find locations (i.e. not crossings) with a weighted distance of 1
-        dist_map = list(gt.shortest_distance(self.graph, cur_pos, max_dist=1, weights=self.graph.ep.weight))
-        vertices_with_distance_one = [
-            self.graph.vp.ids[v] for v in self.graph.iter_vertices() if (dist_map[v] == 1 and 'c' not in self.graph.vp.ids[v])
-        ]
+        vertices_with_distance_one = self.locations_on_away(self.pos)
+
         if prior_location in vertices_with_distance_one:
             vertices_with_distance_one.remove(prior_location)
         self.godmode_print("These are all 1 away from ", self.pos)
@@ -723,7 +743,7 @@ class Jack:
                 
                 if self.pos == "NULL":
                     # I _think_ this case is impossible based on the map layout, but just in case....
-                    self.print("Jack LOSES!")
+                    self.print("Jack \033[1mLOSES\033[0m!")
                     self.print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")
                     self.print("Jack tried to find another location 1 space away, but there was no other legal place to move, so he is trapped.")
                     self.print("Jack was at location " + prior_location + " and is currently at " + self.pos)
@@ -750,7 +770,7 @@ class Jack:
         self.print("\nSearching for clues at: ", pos_list)
         for loc in pos_list:
             if loc in self.path_used:
-                self.print("Clue found at ", loc, "!!")
+                self.print("Clue found at \033[1m", loc, "\033[0m!!")
                 self.clues.append(loc)
                 self.make_image()
                 break
@@ -760,7 +780,7 @@ class Jack:
     def arrest(self, pos):
         #TODO: verify arrest location is next to an ipos?  Or just have players enforce the rules themselves.
         if pos == self.pos:
-            self.print("Congratulations!  You arrested Jack at location ", pos, "!")
+            self.print("Congratulations!  You \033[1marrested\033[0m Jack at location ", pos, "!")
             self.print("Here is the path he took:", self.path_used)
             self.game_in_progress = False
         else:

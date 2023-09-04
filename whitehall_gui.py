@@ -30,6 +30,24 @@ import random
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 
+def on_motion_notify(widget, event):
+    if event.is_hint:
+        x, y, state = event.window.get_pointer()
+    else:
+        x = event.x
+        y = event.y
+        state = event.state
+
+    # Handle mouse movement
+    print(f"Mouse moved to ({x}, {y})")
+
+def on_button_press(widget, event):
+    # Handle mouse button press
+    if event.button == Gdk.BUTTON_PRIMARY:
+        print("Left mouse button pressed")
+    elif event.button == Gdk.BUTTON_SECONDARY:
+        print("Right mouse button pressed")
+        
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
     buffer = text_view.get_buffer()
@@ -251,6 +269,10 @@ class WhiteHallGui:
 
         self.image_widget = Gtk.Image()
     
+        # TODO: this is just a test
+        self.image_widget.connect("motion-notify-event", on_motion_notify)
+        self.image_widget.connect("button-press-event", on_button_press)
+        
         # Create a scrolled window to contain the image widget
         image_scrolled_window = Gtk.ScrolledWindow()
         image_scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)

@@ -29,12 +29,12 @@ import random
 # How many extra turns should Jack leave as "buffer" for completing his path
 TURN_BUFFER = 3
 DEFAULT_WATER_WEIGHT = 3
-DEFAULT_ALLEY_WEIGHT = 20
+DEFAULT_ALLEY_WEIGHT = 13
+DETERRENT_WEIGHTS = [6, 3, 1, 0]
 
 # This difficulty rating is from JACK's point of view, not the players'
 EASY_BUCKET = 0
-MEDIUM_BUCKET = 1
-HARD_BUCKET = 2
+HARD_BUCKET = 1
 
 NORMAL_MOVE = 0
 BOAT_MOVE = 1
@@ -90,6 +90,7 @@ def reset_graph_color_and_shape(ug, scale=1):
 
 class Jack:
     def __init__(self, g, ipos):
+        self.file = open('whitehall.log', 'w')
         self.graph = g
         self.ipos = ipos
         self.godmode = False
@@ -114,6 +115,22 @@ class Jack:
         # Rate all the potential target locations
         self.rate_quads()
         
+        # Create a set of weights only used for the point of view of the investigators, 
+        # so it omits alley and boat paths and it only weights entering crossings
+        self.i_weight = self.graph.new_edge_property("float")
+        self.i_weight.a = self.graph.ep.weight.a.copy()  # copy the underlying associative array
+        for e in self.graph.edges():
+            if self.graph.ep.transport[e] == NORMAL_MOVE:
+                source = self.graph.vp.ids[e.source()]
+                target = self.graph.vp.ids[e.target()]
+                if "c" in source and "c" not in target:
+                    self.i_weight[e] = 0
+                else:
+                    self.i_weight[e] = 1
+            else:
+                self.i_weight[e] = POISON    # Don't use Jack's special paths (boats and alleys)
+            
+            
     def rate_quads(self):
         self.rated_quads = []
         for q in quads:
@@ -140,25 +157,30 @@ class Jack:
             quad_bucket = [[],[],[]]
             for t in q:
                 rating = self.location_safety_rating(t)
-                if rating >= avg_span_high:
+                if rating >= avg:
                     quad_bucket[EASY_BUCKET].append(t)
-                elif rating > avg_span_low:
-                    quad_bucket[MEDIUM_BUCKET].append(t)
+                # For now, only using 2 difficulty levels as using 3 limited the choices for easy and hard for certain quads
+                #elif rating > avg_span_low:
+                #    quad_bucket[MEDIUM_BUCKET].append(t)
                 else:
                     quad_bucket[HARD_BUCKET].append(t)
             
             self.rated_quads.append(quad_bucket)
-        
+            #print(quad_bucket)
 
     def register_output_reporter(self, func):
         self.output_func = func
+        
+    def log_to_file(self, *msg):
+        print(*msg, file=self.file)
         
     def print(self, *msg):
         if (self.output_func == None):
             print(*msg)
         else:
             self.output_func(TEXT_MSG, *msg)
-            
+        self.log_to_file(*msg)
+        
     def gui_refresh(self):
         if (self.output_func is not None):
             self.output_func(IMG_REFRESH)
@@ -213,6 +235,7 @@ class Jack:
     def godmode_print(self, *msg):
         if (self.godmode):
             self.print(*msg)
+        self.log_to_file(*msg)
 
     def pick_the_targets(self, difficulty):
         # Choose the 4 targets for the game
@@ -287,6 +310,9 @@ class Jack:
 
 
     def choose_starting_target(self):
+        self.active_target = random.choice(self.targets)
+        return
+        
         # Built a list of targets that aren't aren't too close to the investigators
         farthest_dist = 0
         farthest_mean = 0
@@ -359,7 +385,7 @@ class Jack:
 
         if len(self.is_poison) == 0:
             for num in range (0, 3):
-                # Only poison if the investigator is a distance of < 2 away
+                # Only poison if the investigator crossing can be reached by Jack in less than 2 moves
                 if self.hop_count(self.ipos[num], self.pos) < 2:
                     self.is_poison.append(num)
                     self.godmode_print("Investigator #", num, "is poison.")
@@ -375,27 +401,30 @@ class Jack:
                     self.graph.ep.weight[e] += adjust
             self.is_poison = [] # Discard the entries so next time this is called, we start over
 
+    def investigator_distance(self, num):
+        # Find the vertex belonging to the `num` ivestigator
+        v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+        distance = gt.shortest_distance(self.graph, v, gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], weights=self.i_weight)
+        return distance
+        
     # Discourage Jack from taking paths near investigators by increasing the weights
-    def discourage_investigators(self, adjust):
+    def discourage_investigators2(self, adjust):
         for num in range (0, 3):
-            # Find the vertex belonging to the `num` inspector
             v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-            # follow paths up to 5 away and adjust them all
-            self.discourage_recursion(v, v, adjust, 5)
-
-    def discourage_recursion(self, v, prior, adjust, depth):
-        depth = depth - 1
-        # Add a weight to all the edges one vertex away from v, following only routes an investigator can take, otherwise alleys cause an exponential increasing of deterrents
-        for out_edge in v.out_edges():
-            if (self.graph.ep.transport[out_edge] == NORMAL_MOVE):
-                n = out_edge.target()
-                for e in n.all_edges():
-                    self.graph.ep.weight[e] += adjust
-                    #print("Edge : ", self.graph.vp.ids[e.source()], self.graph.vp.ids[e.target()], self.graph.ep.weight[e])
-                if depth > 0:
-                    if not (n == prior):
-                        self.discourage_recursion(n, v, adjust, depth)
-
+            distance = self.investigator_distance(num)
+            if (adjust > 0):
+                self.godmode_print("Investigator#", num, "at", self.ipos[num], "is", distance, "away.")
+            if distance <= 3:
+                # Follow paths up to 2 spaces away (from the ivestigator's point of view)
+                v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+                dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
+                for v in visited:
+                    # Only discourage edges directly connected to a location.  Otherwise adjacent crossings poison a path too much.  Jack doesn't care about how many crossings he crosses.
+                    if "c" not in self.graph.vp.ids[self.graph.vertex(v)]:
+                        for e in self.graph.vertex(v).in_edges():
+                            self.graph.ep.weight[e] += adjust
+                            #print("   Discourage Edge : ", self.graph.vp.ids[e.source()], self.graph.vp.ids[e.target()], self.graph.ep.weight[e])
+    
     def status(self):
         self.print()
         self.print("Crimes: ", self.crimes)
@@ -421,7 +450,7 @@ class Jack:
     # then reduce the weights of water if he still has boat cards
     def consider_desperate_weights(self, enabled):
         # TODO: consider alley weights
-        if (self.turn_count() > 7) or (len(self.targets) == 1):
+        if (self.turn_count() > 9) or (len(self.targets) == 1):
             if (enabled):
                 weight = 1
                 self.godmode_print("Jack is desperate")
@@ -435,18 +464,22 @@ class Jack:
         return len(self.path_used)
         
 
+    def free_edge_count(self, pos):
+        raw_pos = gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]
+        #calculate the out-degree but don't count boat or alley paths or poisoned paths
+        out_degree = 0
+        for edge in raw_pos.out_edges():
+            if (self.graph.ep.transport[edge] == NORMAL_MOVE) and (self.graph.ep.weight[edge] < POISON):
+                out_degree += 1
+        return out_degree
+    
     # Compute the safety rating of a location - HIGHER is SAFER
     def location_safety_rating(self, pos):
         one_away = self.locations_one_away(pos)
-        raw_pos = gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]
-        #calculate the out-degree but don't count boat or alley paths
-        out_degree = 0
-        for edge in raw_pos.out_edges():
-            if (self.graph.ep.transport[edge]) == NORMAL_MOVE:
-                out_degree += 1
+        out_degree = self.free_edge_count(pos)
         return len(one_away) * out_degree
 
-    # Experimenting with Breadth-first-search to see if it is faster than my hackish find_adjacent_nongoal_vertex() (defined further down)
+    # Return the LOCATIONS (not crossings) exactly 1 space away from `source` assuming Jack's movement
     def locations_one_away(self, source):
         pos = gt.find_vertex(self.graph, self.graph.vp.ids, source)[0]
         dist_map = list(gt.shortest_distance(self.graph, pos, max_dist=1, weights=self.graph.ep.weight))
@@ -478,18 +511,30 @@ class Jack:
             closest = 100
             average = 0
             
-            # Find how far away each investigator is from Jack - don't use weights - we want to count edges
-            for ipos in self.ipos:
-                v = gt.find_vertex(self.graph, self.graph.vp.ids, ipos)[0]
-                dist = gt.shortest_distance(self.graph, gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], v)
-                self.godmode_print("ipos " + ipos + " is " + str(dist) + " away.")
-                average += dist
-                if dist < closest:
-                    closest = dist
+            dist = [0, 0, 0]
+            # Find how far away each investigator is from Jack 
+            for num in range(0,3):
+                dist[num] = self.investigator_distance(num)
+                self.godmode_print("ipos " + self.ipos[num] + " is " + str(dist[num]) + " away.")
+                average += dist[num]
+                if dist[num] < closest:
+                    closest = dist[num]
             average = average / 3
             self.godmode_print("Average = ", average)
             
-            on_clue = (self.pos in self.clues) or (self.pos == self.crimes[-1])
+            num_very_close = 0
+            for num in dist:
+                if num <= 1:
+                    num_very_close += 1
+            self.godmode_print(num_very_close, "are very close.")
+            
+            # Is Jack on the most recent clue?
+            on_clue = len(self.clues) > 0 and (self.pos == self.clues[-1])
+            
+            # How many outbound edges are not blocked by investigators?
+            self.poison_investigators(POISON)
+            free_edge_count = self.free_edge_count(self.pos)
+            self.poison_investigators(-POISON)
             
             # If the investigator crossing is adjacent to Jack, or all the investigators on average are close, 
             # or Jack is searching for the final target on his list and the investigators are somewhat close,
@@ -497,7 +542,7 @@ class Jack:
             # TODO - add some random variability to the threshold?  
             #        or maybe if the number of clues found is over X _and_ the average is < Y
             #        or maybe if the running average is < X over Y turns?
-            if ((closest < 2 and on_clue) or average < 2.5) or (len(self.targets) == 1 and average < 4):
+            if ((closest < 1 and on_clue) or average < 0.5) or (len(self.targets) == 1 and average < 1.5) or (num_very_close >= 2 and free_edge_count < num_very_close):
                 ret = COACH_MOVE
         return ret
 
@@ -510,14 +555,14 @@ class Jack:
         self.set_travel_weight(ALLEY_MOVE, POISON)
         
         # decide on a path
-        deterrents = [1, 0.5, 0.25, 0]
+        deterrents = DETERRENT_WEIGHTS
         for deterrent in deterrents:
             v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
             v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
 
-            self.discourage_investigators(deterrent)
+            self.discourage_investigators2(deterrent)
             vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-            self.discourage_investigators(-deterrent)
+            self.discourage_investigators2(-deterrent)
             
             # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
             cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
@@ -565,7 +610,7 @@ class Jack:
         # Poison the position of the investigators (i.e. add weights)
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
         self.poison_investigators(POISON)
-        self.discourage_investigators(deterrent)
+        self.discourage_investigators2(deterrent)
         self.consider_desperate_weights(True)
 
         v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
@@ -597,7 +642,7 @@ class Jack:
 
         # un-poison the ipos edges
         self.poison_investigators(-POISON)
-        self.discourage_investigators(-deterrent)
+        self.discourage_investigators2(-deterrent)
         self.consider_desperate_weights(False)
     
         # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
@@ -643,7 +688,8 @@ class Jack:
             else: 
                 path_ok = True
                 if (alleys_poison):
-                    self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+                    if (len(self.alley_cards) < 2):
+                        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
                     alleys_poison = False
         
         return [vlist, cost, move_type]
@@ -680,7 +726,7 @@ class Jack:
         #self.choose_closest_target()
         
         # decide on a path
-        deterrents = [1, 0.5, 0.25, 0]
+        deterrents = DETERRENT_WEIGHTS
         for deterrent in deterrents:
             vlist, cost, move_type = self.pick_a_path(deterrent)
             if not self.game_in_progress:
@@ -688,6 +734,13 @@ class Jack:
             if (cost <= ((16 - TURN_BUFFER) - self.turn_count())):
                 self.godmode_print("   Jack finds this cost acceptable.")
                 break;
+        
+        # Have you considered the advantages to taking a COACH?
+        # Check if we are only moving 2 or less (either via normal move (which must be 1) or special card)
+        if (move_type != COACH_MOVE) and (self.hop_count(self.pos, self.graph.vp.ids[vlist[1]]) <= 2):
+            # If we are one space away from the goal, don't use a coach, otherwise, think about it.
+            if (self.hop_count(self.pos, self.active_target) != 1):
+                move_type = self.consider_coach_move()
         
         # If a water path was selected, spend the card
         if move_type == BOAT_MOVE:
@@ -709,12 +762,6 @@ class Jack:
                 # poison all the alley paths - Jack has no alley cards left
                 self.set_travel_weight(ALLEY_MOVE, POISON)
         
-        # Have you considered the advantages to taking a COACH?
-        if (move_type == NORMAL_MOVE):
-            # If we are one space away from the goal, don't use a coach, otherwise, think about it.
-            if (self.hop_count(self.pos, self.active_target) != 1):
-                move_type = self.consider_coach_move()
-                
         # If we decide we should use a coach, revise the path since we can move through investigators
         if (move_type == COACH_MOVE):
             vlist = self.pick_a_coach_path()

@@ -147,6 +147,7 @@ def parse_cost(user_input):
 def process_input(user_input):
     # NOTE: This does only very rudimentary syntax checking. It is NOT a feature-rich UI
     #       For example, it does simple substring matching for some commands.
+    jack.log_to_file("\033[1m>", user_input, "\033[0m")
     
     split_input = user_input.split(" ", 1)
     command = split_input[0]
@@ -218,9 +219,6 @@ def process_input(user_input):
         if (pos != "BAD"):
             jack.pos = pos
             jack.make_image()
-            # TODO: just testing the algorithm - remove when done
-            print(jack.locations_one_away(pos))
-            print(jack.location_safety_rating(pos))
             
     elif jack.godmode and "cost" == command:
         parse_cost(parms)

@@ -275,9 +275,9 @@ class Jack:
 
     
     # Calculate the number of vertices away from the target - every vertex should have a weight of 1
-    def hop_count(self, src, dest):
+    def hop_count(self, src, dest, boats_reduced=True):
         #unweight the water paths if Jack still has a boat card
-        if (len(self.boat_cards) < 2):
+        if (boats_reduced) and (len(self.boat_cards) < 2):
             self.set_travel_weight(BOAT_MOVE, 1)
         
         v1 = gt.find_vertex(self.graph, self.graph.vp.ids, src)[0]
@@ -285,7 +285,7 @@ class Jack:
         shortest = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
 
         #re-weight the water paths if Jack still has a boat card
-        if (len(self.boat_cards) < 2):
+        if (boats_reduced) and (len(self.boat_cards) < 2):
             self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
         
         return shortest
@@ -743,7 +743,7 @@ class Jack:
         
         # Have you considered the advantages to taking a COACH?
         # Check if we are only moving 2 or less (either via normal move (which must be 1) or special card)
-        if (move_type != COACH_MOVE) and (self.hop_count(self.pos, self.graph.vp.ids[vlist[1]]) <= 2):
+        if (move_type != COACH_MOVE) and (self.hop_count(self.pos, self.graph.vp.ids[vlist[1]], boats_reduced=False) <= 2):
             # If we are one space away from the goal, don't use a coach, otherwise, think about it.
             if (self.hop_count(self.pos, self.active_target) != 1):
                 if self.consider_coach_move():

@@ -491,10 +491,11 @@ class Jack:
     def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach
         # Pick another vertex that is 1 space away and isn't where he was previously, since that is also against the rules
-        vertices_with_distance_one = self.locations_on_away(self.pos)
+        vertices_with_distance_one = self.locations_one_away(self.pos)
 
+        self.godmode_print("   removing:", prior_location)
         if prior_location in vertices_with_distance_one:
-            vertices_with_distance_one.remove(prior_location)
+            vertices_with_distance_one.remove(loc)
         self.godmode_print("These are all 1 away from ", self.pos)
         self.godmode_print(vertices_with_distance_one)
         if (len(vertices_with_distance_one) > 0):
@@ -506,7 +507,7 @@ class Jack:
 
     
     def consider_coach_move(self):
-        ret = NORMAL_MOVE
+        ret = False
         if len(self.coach_cards) < 2:
             closest = 100
             average = 0
@@ -543,7 +544,7 @@ class Jack:
             #        or maybe if the number of clues found is over X _and_ the average is < Y
             #        or maybe if the running average is < X over Y turns?
             if ((closest < 1 and on_clue) or average < 0.5) or (len(self.targets) == 1 and average < 1.5) or (num_very_close >= 2 and free_edge_count < num_very_close):
-                ret = COACH_MOVE
+                ret = True
         return ret
 
     # Choose the path when Jack has decided he needs to use a coach
@@ -631,9 +632,12 @@ class Jack:
         
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
-        if gt.shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight) >= POISON:
+        next_dist = gt.shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight)
+        self.godmode_print("   Next dist is:", next_dist)
+        if next_dist >= POISON:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
                 # do coach move
+                self.godmode_print("Must use a coach!")
                 move_type = COACH_MOVE
             else:
                 self.print("Jack cannot move.  You win!")
@@ -649,22 +653,24 @@ class Jack:
         cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
         self.godmode_print("    Cost: ", cost)
 
-        # Going from a water space to another water space - must be using a boat
-        if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
-            move_type = BOAT_MOVE
+        # If we didn't decide we have to take a coach, figure out if it was a boat or alley move, based on the next vertex in the path
+        if move_type != COACH_MOVE:
+            # Going from a water space to another water space - must be using a boat
+            if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
+                move_type = BOAT_MOVE
         
-        # Jack didn't pass through any crossings - must be using an alley
-        elif 'c' not in self.graph.vp.ids[vlist[1]]:
-            # Confirm Jack couldn't have gotten there in 1 turn using a normal move.
-            # If he could, don't waste an alley card
-            if not self.normal_move_possible(self.pos, self.graph.vp.ids[vlist[1]]):
-                move_type = ALLEY_MOVE
-            else:
-                self.godmode_print("Hmmm...   Jack thought to use an alley, but he can just walk there.")
-                self.godmode_print("   Randomly decide.")
-                # Randomly decide to use it so not totally predictable where he went when he uses an alley card.
-                if random.randint(1, 100) < 18:
+            # Jack didn't pass through any crossings - must be using an alley
+            elif 'c' not in self.graph.vp.ids[vlist[1]]:
+                # Confirm Jack couldn't have gotten there in 1 turn using a normal move.
+                # If he could, don't waste an alley card
+                if not self.normal_move_possible(self.pos, self.graph.vp.ids[vlist[1]]):
                     move_type = ALLEY_MOVE
+                else:
+                    self.godmode_print("Hmmm...   Jack thought to use an alley, but he can just walk there.")
+                    self.godmode_print("   Randomly decide.")
+                    # Randomly decide to use it so not totally predictable where he went when he uses an alley card.
+                    if random.randint(1, 100) < 18:
+                        move_type = ALLEY_MOVE
     
         return [vlist, cost, move_type]
         
@@ -740,7 +746,8 @@ class Jack:
         if (move_type != COACH_MOVE) and (self.hop_count(self.pos, self.graph.vp.ids[vlist[1]]) <= 2):
             # If we are one space away from the goal, don't use a coach, otherwise, think about it.
             if (self.hop_count(self.pos, self.active_target) != 1):
-                move_type = self.consider_coach_move()
+                if self.consider_coach_move():
+                    move_type = COACH_MOVE
         
         # If a water path was selected, spend the card
         if move_type == BOAT_MOVE:
@@ -760,6 +767,7 @@ class Jack:
             
             if (len(self.alley_cards)>= 2):
                 # poison all the alley paths - Jack has no alley cards left
+                self.godmode_print("Poisoning alleys so they can no longer be used.")
                 self.set_travel_weight(ALLEY_MOVE, POISON)
         
         # If we decide we should use a coach, revise the path since we can move through investigators

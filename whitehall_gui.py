@@ -29,24 +29,6 @@ import re
 import random
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
-
-def on_motion_notify(widget, event):
-    if event.is_hint:
-        x, y, state = event.window.get_pointer()
-    else:
-        x = event.x
-        y = event.y
-        state = event.state
-
-    # Handle mouse movement
-    print(f"Mouse moved to ({x}, {y})")
-
-def on_button_press(widget, event):
-    # Handle mouse button press
-    if event.button == Gdk.BUTTON_PRIMARY:
-        print("Left mouse button pressed")
-    elif event.button == Gdk.BUTTON_SECONDARY:
-        print("Right mouse button pressed")
         
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
@@ -97,8 +79,27 @@ class WhiteHallGui:
     
     def __init__(self):
         self.jack_token_pos = -1
-        self.turn_buttons = []
+        self.turn_buttons = []            
     
+    def on_motion_notify(self, widget, event):
+        if event.is_hint:
+            x, y, state = event.window.get_pointer()
+        else:
+            x = event.x
+            y = event.y
+            state = event.state
+
+        image_x, image_y = widget.translate_coordinates(self.image_widget, x, y)
+        # Handle mouse movement
+        print(f"Mouse moved to ({x}, {y}) which is really ({image_x}), {image_y}")
+
+    def on_button_press(self, widget, event):
+        # Handle mouse button press
+        if event.button == Gdk.BUTTON_PRIMARY:
+            print("Left mouse button pressed")
+        elif event.button == Gdk.BUTTON_SECONDARY:
+            print("Right mouse button pressed")
+            
     def process_output(self, output_type, *msg):
     
         if (output_type == wh.TEXT_MSG):
@@ -269,10 +270,6 @@ class WhiteHallGui:
 
         self.image_widget = Gtk.Image()
     
-        # TODO: this is just a test
-        self.image_widget.connect("motion-notify-event", on_motion_notify)
-        self.image_widget.connect("button-press-event", on_button_press)
-        
         # Create a scrolled window to contain the image widget
         image_scrolled_window = Gtk.ScrolledWindow()
         image_scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -281,6 +278,11 @@ class WhiteHallGui:
         # Load the initial game board map view
         load_image(self.image_widget)
     
+        # TODO: this is just a test
+        image_scrolled_window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+        image_scrolled_window.connect("motion-notify-event", self.on_motion_notify)
+        image_scrolled_window.connect("button-press-event", self.on_button_press)
+        
         frame2 = Gtk.Frame()
         frame2.set_hexpand(True)
         frame2.set_vexpand(True)

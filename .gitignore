@@ -1,2 +1,6 @@
 *.pyc
 *.log
+.DS_Store
+my_graph_after.graphml
+my_graph.graphml
+my_graph_after.graphml

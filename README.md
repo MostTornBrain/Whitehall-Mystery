@@ -9,7 +9,7 @@ CAVEAT: This is still a work-in-progress.  I have transcribed the map into di-gr
 
 To start, run `whitehall_gui.py`.   Assuming you have the graph-tool package installed, you should be presented with a fullscreen UI with the command-line-interface on the left and a graph view of the map state on the right.   Commands are entered in the small entry window on the lower left.
 
-![Starting Screen](whitehall.png)
+![Starting Screen](images/whitehall.png)
 
 Type `help` at the prompt to get a full list of commands.  
 

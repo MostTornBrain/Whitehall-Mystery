@@ -2,6 +2,4 @@
 *.log
 .DS_Store
 *.graphml
-
-*.graphml
 images/jack.png

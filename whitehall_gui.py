@@ -32,6 +32,13 @@ positions_dict = {}
 SCALE = 0.78
 INVESTIGATOR_HEIGHT = 50
 
+def is_point_within_widget(widget, x, y):
+    allocation = widget.get_allocation()
+    x_bounds = allocation.x, allocation.x + allocation.width
+    y_bounds = allocation.y, allocation.y + allocation.height
+
+    return x_bounds[0] <= x <= x_bounds[1] and y_bounds[0] <= y <= y_bounds[1]
+
 def create_positions_dictionary():
     for item in wh.positions:
         id_value = item[0]
@@ -85,13 +92,21 @@ def on_button_press_event(radio_button, event):
         radio_button.set_active(radio_button.get_active())
         return True  # Prevent the default toggle behavior
 
+class DragData:
+    def __init__(self, widget, x, y):
+         self.widget = widget
+         self.start_x = x
+         self.start_y = y
+         self.offset_x = 0
+         self.offset_y = 0
+
 class WhiteHallGui:
     
     def __init__(self):
         self.jack_token_pos = -1
         self.turn_buttons = []            
     
-    def on_motion_notify(self, widget, event):
+    def on_motion_notify(self, widget, event, drag_data):
         if event.is_hint:
             x, y, state = event.window.get_pointer()
         else:
@@ -103,15 +118,44 @@ class WhiteHallGui:
         # Handle mouse movement
         if event.window == widget.get_window():
             pass
-            #print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
+            print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
+            if event.state & Gdk.EventMask.BUTTON_PRESS_MASK and None != drag_data.widget :
+                drag_data.widget.set_valign(Gtk.Align.START)
+                x = int(event.x + drag_data.offset_x)
+                y = int(event.y + drag_data.offset_y)
+                
+                allocation = Gdk.Rectangle()
+                allocation.x = x
+                allocation.y = y
+                allocation.width = drag_data.widget.get_allocation().width
+                allocation.height = drag_data.widget.get_allocation().height
+                
+                drag_data.widget.size_allocate(allocation)
 
-    def on_button_press(self, widget, event):
+    def on_button_press(self, widget, event, drag_data):
         # Handle mouse button press
+        x = event.x
+        y= event.y
         if event.button == Gdk.BUTTON_PRIMARY:
-            print("Left mouse button pressed")
+            print("Left mouse button pressed at (x={}, y={})".format(x, y))
+            for num in range(0,3):
+                if is_point_within_widget(self.investigator_imgs[num], x, y):
+                    print("Yo!  You clicked on ", num)
+                    drag_data.widget = self.investigator_imgs[num]
+                    allocation = self.investigator_imgs[num].get_allocation()
+                    drag_data.start_x = allocation.x
+                    drag_data.start_y = allocation.y
+                    drag_data.offset_x = drag_data.start_x - event.x
+                    drag_data.offset_y = drag_data.start_y - event.y
         elif event.button == Gdk.BUTTON_SECONDARY:
             print("Right mouse button pressed")
-            
+    
+    def button_release_event(self, widget, event, drag_data):
+        if event.button == Gdk.BUTTON_PRIMARY:
+            drag_data.offset_x = 0
+            drag_data.offset_y = 0
+            drag_data.widget = None
+    
     def process_output(self, output_type, *msg):
     
         if (output_type == wh.TEXT_MSG):
@@ -220,6 +264,10 @@ class WhiteHallGui:
         self.jack_token_pos = curr_turn
 
         # TODO: experiment to add a bitmap for an investigator
+        fixed_children = self.fixed_frame.get_children()
+        for num in range (0,3):
+            if self.investigator_imgs[num] in fixed_children:
+                self.fixed_frame.remove(self.investigator_imgs[num]) 
         for num in range (0,3):
             ipos = wh.jack.ipos[num]
             x, y = positions_dict[ipos]
@@ -303,9 +351,11 @@ class WhiteHallGui:
         load_image(self.image_widget)
     
         # TODO: this is just a test
-        image_scrolled_window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
-        image_scrolled_window.connect("motion-notify-event", self.on_motion_notify)
-        image_scrolled_window.connect("button-press-event", self.on_button_press)
+        drag_data1 = DragData(None, 0, 0)
+        image_scrolled_window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK)
+        image_scrolled_window.connect("motion-notify-event", self.on_motion_notify, drag_data1)
+        image_scrolled_window.connect("button-press-event", self.on_button_press, drag_data1)
+        image_scrolled_window.connect("button-release-event", self.button_release_event, drag_data1)
         
         frame2 = Gtk.Frame()
         frame2.set_hexpand(True)
@@ -347,8 +397,12 @@ class WhiteHallGui:
 
         self.investigator_imgs = []
         for num in range (0,3):
-            self.investigator_imgs.append(Gtk.Image.new_from_file(f"images/{investigators[num]}"))
-        
+            i_img = Gtk.Image.new_from_file(f"images/{investigators[num]}")
+            self.investigator_imgs.append(i_img)
+            i_img.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+            i_img.connect("motion-notify-event", self.on_motion_notify)
+            i_img.connect("button-press-event", self.on_button_press)
+            
         # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
         wh.register_gui_self_test(self.self_test)
         wh.register_output_reporter(self.process_output)    

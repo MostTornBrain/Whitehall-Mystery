@@ -27,7 +27,19 @@ from gi.repository import Gtk, GdkPixbuf, Pango, Gdk, GLib
 import whitehall as wh
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
-        
+investigators = ["yellow.png", "blue.png", "red.png"]
+positions_dict = {}
+SCALE = 0.78
+INVESTIGATOR_HEIGHT = 50
+
+def create_positions_dictionary():
+    for item in wh.positions:
+        id_value = item[0]
+        x, y = item[1]
+        x = x * SCALE - 5
+        y = y * SCALE - INVESTIGATOR_HEIGHT
+        positions_dict[id_value] = [x, y]
+
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
     buffer = text_view.get_buffer()
@@ -54,7 +66,7 @@ def load_image(image_widget):
     pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
 
     # Calculate the scaling factor to fit the image in the canvas
-    scale_factor = 0.78
+    scale_factor = SCALE
 
     # Calculate the new width and height of the scaled image
     new_width = int(pixbuf.get_width() * scale_factor)
@@ -152,7 +164,7 @@ class WhiteHallGui:
                 jack_overlay.add_overlay(jack_widget)
                 jack_overlay.show_all()
         else:
-            self.refresh_turn_track()
+            self.refresh_board()
     
     def process_command_helper(self, command):    
         # Get the text buffer from the text view
@@ -187,7 +199,7 @@ class WhiteHallGui:
         GLib.idle_add(self.process_command_helper, command)
         #GLib.timeout_add(1, process_command_helper, command)
 
-    def refresh_turn_track(self):
+    def refresh_board(self):
         curr_turn = wh.game_turn()
         load_image(self.image_widget)
         self.image_widget.queue_draw()
@@ -206,8 +218,18 @@ class WhiteHallGui:
 
         curr_overlay.show_all()
         self.jack_token_pos = curr_turn
+
+        # TODO: experiment to add a bitmap for an investigator
+        for num in range (0,3):
+            ipos = wh.jack.ipos[num]
+            x, y = positions_dict[ipos]
+            self.fixed_frame.put(self.investigator_imgs[num], x, y)
+
+
     
     def setup(self):
+        create_positions_dictionary()
+        
         # Create the main window
         self.window = Gtk.Window()
         self.window.set_title("Whitehall Mystery Jack Automaton")
@@ -269,11 +291,13 @@ class WhiteHallGui:
         grid.attach(box, 0, 2, 1, 1)
 
         self.image_widget = Gtk.Image()
-    
+        self.fixed_frame = Gtk.Fixed()
+        self.fixed_frame.add(self.image_widget)
+
         # Create a scrolled window to contain the image widget
         image_scrolled_window = Gtk.ScrolledWindow()
         image_scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        image_scrolled_window.add(self.image_widget)
+        image_scrolled_window.add(self.fixed_frame)
 
         # Load the initial game board map view
         load_image(self.image_widget)
@@ -321,11 +345,15 @@ class WhiteHallGui:
         # Pressing enter in the entry widget triggers the process_command() function
         self.entry.connect("activate", self.process_command)
 
+        self.investigator_imgs = []
+        for num in range (0,3):
+            self.investigator_imgs.append(Gtk.Image.new_from_file(f"images/{investigators[num]}"))
+        
         # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
         wh.register_gui_self_test(self.self_test)
         wh.register_output_reporter(self.process_output)    
         wh.welcome()
-        self.refresh_turn_track()
+        self.refresh_board()
     
         # Connect the resize_image function to the "realize" signal of the window
         #window.connect("realize", resize_image)

@@ -50,7 +50,7 @@ def _autoscroll(self, *args):
 
 def load_image(image_widget):
     # Load the bitmap image
-    image_path = "jack.png"
+    image_path = "images/jack.png"
     pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
 
     # Calculate the scaling factor to fit the image in the canvas
@@ -122,14 +122,14 @@ class WhiteHallGui:
         elif (output_type == wh.SPECIAL_TRAVEL_MSG):
             overlay = self.turn_buttons[wh.game_turn()+1]
             travel_type = msg[0]
-            image = Gtk.Image.new_from_file(travel_images[travel_type])
+            image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
             overlay.add_overlay(image)
             overlay.show_all()
     
             # need a second image to cover the second turn the coach took
             if travel_type == wh.COACH_MOVE:
                 overlay = self.turn_buttons[wh.game_turn()+2]
-                image = Gtk.Image.new_from_file(travel_images[travel_type])
+                image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
                 overlay.add_overlay(image)
                 overlay.show_all()
         
@@ -196,7 +196,7 @@ class WhiteHallGui:
         # Move the jack token to the current turn space
         curr_overlay = self.turn_buttons[curr_turn]        
         if (self.jack_token_pos == -1):
-            image = Gtk.Image.new_from_file("jack-corner.png")
+            image = Gtk.Image.new_from_file("images/jack-corner.png")
             curr_overlay.add_overlay(image)
         elif (self.jack_token_pos != curr_turn):
             prev_overlay = self.turn_buttons[self.jack_token_pos]

@@ -227,7 +227,7 @@ class Jack:
                       edge_control_points=control,
                       adjust_aspect=False, fit_view=False,
                       #window=self.win, return_window=True, main=False)
-                      output="jack.png")
+                      output="images/jack.png")
         
         # Trigger the map to refresh in the GUI
         self.gui_refresh()

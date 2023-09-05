@@ -56,7 +56,7 @@ def load_image(image_widget):
     pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
 
     # Calculate the scaling factor to fit the image in the canvas
-    scale_factor = 0.8
+    scale_factor = 0.78
 
     # Calculate the new width and height of the scaled image
     new_width = int(pixbuf.get_width() * scale_factor)
@@ -91,7 +91,9 @@ class WhiteHallGui:
 
         image_x, image_y = widget.translate_coordinates(self.image_widget, x, y)
         # Handle mouse movement
-        print(f"Mouse moved to ({x}, {y}) which is really ({image_x}), {image_y}")
+        if event.window == widget.get_window():
+            pass
+            #print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
 
     def on_button_press(self, widget, event):
         # Handle mouse button press

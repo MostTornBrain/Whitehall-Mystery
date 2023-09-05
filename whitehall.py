@@ -25,6 +25,8 @@ import graph_tool.all as gt
 from jack import *
 import re
 
+SCALE=2
+
 ug = gt.Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
 
 vcolor = ug.new_vp("string")
@@ -40,6 +42,9 @@ vpos = ug.new_vp("vector<double>")
 for pair in positions:
     #jack.print(pair)
     v=gt.find_vertex(ug, ug.vp.ids, pair[0])[0]
+    pair[1][1] += 871
+    pair[1][0] *= SCALE
+    pair[1][1] *= SCALE
     vpos[v] = pair[1]
 
 # Print out nodes with missing positions for help when editing by hand

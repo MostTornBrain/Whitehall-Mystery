@@ -1,4 +1,5 @@
 '''
+******************************************************************************
 MIT License
 
 Copyright (c) 2023 Brian Stormont
@@ -20,6 +21,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+******************************************************************************
+
+PLEASE NOTE: the following data is based on an analysis of the board game
+Whitehall Mystery, published by Fantasy Flight Games in 2016.
+
+No rights to the intellectual property of Fantasy Flight Games are expressed
+or implied.
+
+******************************************************************************
 '''
 
 quads = [[ "1", "2", "3", 

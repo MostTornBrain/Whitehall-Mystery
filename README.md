@@ -3,13 +3,13 @@ Attempt at creating a computer player for Jack for the board game Whitehall Myst
 
 My board game group size is usually three people.   We really enjoy Whitehall Mystery, but wanted to all play investigators for a change.  Hence this project.  My main goal was to allow human players to play against a computerized Jack, initially via text entry commands specifying move actions, looking for clues, and performing arrests. A more distant goal is to perform moves via a graphical interface.
 
-NOTE: This requires the python [graph-tool](https://graph-tool.skewed.de/static/doc/index.html) library.
+NOTE: This requires the python [graph-tool](https://graph-tool.skewed.de/static/doc/index.html), and [pyqtree](https://pypi.org/project/Pyqtree/) library.
 
 CAVEAT: This is still a work-in-progress.  I have transcribed the map into di-graph form and Jack is playable. The use of special cards still needs some refinement.
 
 To start, run `whitehall_gui.py`.   Assuming you have the graph-tool package installed, you should be presented with a fullscreen UI with the command-line-interface on the left and a graph view of the map state on the right.   Commands are entered in the small entry window on the lower left.
 
-![Starting Screen](whitehall.png)
+![Starting Screen](images/whitehall.png)
 
 Type `help` at the prompt to get a full list of commands.  
 

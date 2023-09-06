@@ -1,4 +1,4 @@
-'''
+"""
 MIT License
 
 Copyright (c) 2023 Brian Stormont
@@ -20,15 +20,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+"""
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf, Pango, Gdk, GLib
+from pyqtree import Index
 import whitehall as wh
-import re
-import random
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
+investigators = ["yellow.png", "blue.png", "red.png"]
+positions_dict = {}
+quadtree = Index(bbox=(0, 0, 1500, 1500))
+SCALE = 0.78
+INVESTIGATOR_HEIGHT = 50
+
+def is_point_within_widget(widget, x, y):
+    allocation = widget.get_allocation()
+    x_bounds = allocation.x, allocation.x + allocation.width
+    y_bounds = allocation.y, allocation.y + allocation.height
+
+    return x_bounds[0] <= x <= x_bounds[1] and y_bounds[0] <= y <= y_bounds[1]
+
+def create_positions_dictionary():
+    for item in wh.positions:
+        id_value = item[0]
+        x, y = item[1]
+        x = x * SCALE
+        y = y * SCALE
+        positions_dict[id_value] = [x, y]
+        
+    # Also create a quad tree for efficient hit detection the crossings
+    for id, (x, y) in positions_dict.items():
+        quadtree.insert(item=id, bbox=(x-10, y-10, x+10, y+20))
 
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
@@ -52,11 +75,11 @@ def _autoscroll(self, *args):
 
 def load_image(image_widget):
     # Load the bitmap image
-    image_path = "jack.png"
+    image_path = "images/jack.png"
     pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
 
     # Calculate the scaling factor to fit the image in the canvas
-    scale_factor = 0.8
+    scale_factor = SCALE
 
     # Calculate the new width and height of the scaled image
     new_width = int(pixbuf.get_width() * scale_factor)
@@ -75,11 +98,98 @@ def on_button_press_event(radio_button, event):
         radio_button.set_active(radio_button.get_active())
         return True  # Prevent the default toggle behavior
 
+class DragData:
+    def __init__(self, widget, x, y):
+         self.widget = widget
+         self.start_x = x
+         self.start_y = y
+         self.offset_x = 0
+         self.offset_y = 0
+         self.investigator_id = None
+         self.crossing = None
+
+
 class WhiteHallGui:
     
     def __init__(self):
         self.jack_token_pos = -1
-        self.turn_buttons = []
+        self.turn_buttons = []            
+    
+    def on_motion_notify(self, widget, event, drag_data):
+        if event.is_hint:
+            x, y, state = event.window.get_pointer()
+        else:
+            x = event.x
+            y = event.y
+            state = event.state
+
+        image_x, image_y = widget.translate_coordinates(self.image_widget, x, y)
+        # Handle mouse movement
+        if event.window == widget.get_window():
+            pass
+            #print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
+            if event.state & Gdk.EventMask.BUTTON_PRESS_MASK and None != drag_data.widget :
+                drag_data.widget.set_valign(Gtk.Align.START)
+                x = int(event.x + drag_data.offset_x)
+                y = int(event.y + drag_data.offset_y)
+                
+                allocation = Gdk.Rectangle()
+                allocation.x = x
+                allocation.y = y
+                allocation.width = drag_data.widget.get_allocation().width
+                allocation.height = drag_data.widget.get_allocation().height
+                
+                # Check if we are over a crossing
+                ids = quadtree.intersect((image_x, image_y, image_x, image_y))
+                if ids and "c" in ids[0]:
+                    (id_x, id_y) = positions_dict[ids[0]]
+                    print("Found at location with ID:", ids[0], positions_dict[ids[0]])
+                    drag_data.crossing = ids[0]
+                    #Snap the image widget to the location so it looks like it is standing on it
+                    allocation.x = id_x - 5
+                    allocation.y = id_y - INVESTIGATOR_HEIGHT
+                    # Save this new crossing as the place of origin for the inspector widget (in case we release it slightly off a crossing later)
+                    drag_data.start_x = allocation.x
+                    drag_data.start_y = allocation.y
+                    
+                drag_data.widget.size_allocate(allocation)
+
+    def on_button_press(self, widget, event, drag_data):
+        # Handle mouse button press
+        x = event.x
+        y= event.y
+        if event.button == Gdk.BUTTON_PRIMARY:
+            print("Left mouse button pressed at (x={}, y={})".format(x, y))
+            for num in range(0,3):
+                if is_point_within_widget(self.investigator_imgs[num], x, y):
+                    print("Yo!  You clicked on ", num)
+                    drag_data.investigator_id = num
+                    drag_data.crossing = wh.jack.ipos[num]  # Save starting crossing in case investigator is released before being on a new crossing
+                    drag_data.widget = self.investigator_imgs[num]
+                    allocation = self.investigator_imgs[num].get_allocation()
+                    drag_data.start_x = allocation.x
+                    drag_data.start_y = allocation.y
+                    drag_data.offset_x = drag_data.start_x - event.x
+                    drag_data.offset_y = drag_data.start_y - event.y
+        elif event.button == Gdk.BUTTON_SECONDARY:
+            print("Right mouse button pressed")
+    
+    def button_release_event(self, widget, event, drag_data):
+        if event.button == Gdk.BUTTON_PRIMARY and drag_data.crossing != None:
+            # Save the ipos for this widget to the game state
+            wh.jack.ipos[drag_data.investigator_id] = drag_data.crossing
+            
+            self.fixed_frame.remove(self.investigator_imgs[drag_data.investigator_id])
+            (x, y) = positions_dict[drag_data.crossing]
+            self.fixed_frame.put(self.investigator_imgs[drag_data.investigator_id], x - 5, y - INVESTIGATOR_HEIGHT)
+            
+            # clear the dragging info - we have released the investigator
+            drag_data.offset_x = 0
+            drag_data.offset_y = 0
+            drag_data.widget = None
+            drag_data.investigator_id = None
+            drag_data.crossing = None
+            
     
     def process_output(self, output_type, *msg):
     
@@ -103,14 +213,14 @@ class WhiteHallGui:
         elif (output_type == wh.SPECIAL_TRAVEL_MSG):
             overlay = self.turn_buttons[wh.game_turn()+1]
             travel_type = msg[0]
-            image = Gtk.Image.new_from_file(travel_images[travel_type])
+            image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
             overlay.add_overlay(image)
             overlay.show_all()
     
             # need a second image to cover the second turn the coach took
             if travel_type == wh.COACH_MOVE:
                 overlay = self.turn_buttons[wh.game_turn()+2]
-                image = Gtk.Image.new_from_file(travel_images[travel_type])
+                image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
                 overlay.add_overlay(image)
                 overlay.show_all()
         
@@ -133,7 +243,7 @@ class WhiteHallGui:
                 jack_overlay.add_overlay(jack_widget)
                 jack_overlay.show_all()
         else:
-            self.refresh_turn_track()
+            self.refresh_board()
     
     def process_command_helper(self, command):    
         # Get the text buffer from the text view
@@ -168,7 +278,7 @@ class WhiteHallGui:
         GLib.idle_add(self.process_command_helper, command)
         #GLib.timeout_add(1, process_command_helper, command)
 
-    def refresh_turn_track(self):
+    def refresh_board(self):
         curr_turn = wh.game_turn()
         load_image(self.image_widget)
         self.image_widget.queue_draw()
@@ -177,7 +287,7 @@ class WhiteHallGui:
         # Move the jack token to the current turn space
         curr_overlay = self.turn_buttons[curr_turn]        
         if (self.jack_token_pos == -1):
-            image = Gtk.Image.new_from_file("jack-corner.png")
+            image = Gtk.Image.new_from_file("images/jack-corner.png")
             curr_overlay.add_overlay(image)
         elif (self.jack_token_pos != curr_turn):
             prev_overlay = self.turn_buttons[self.jack_token_pos]
@@ -187,8 +297,23 @@ class WhiteHallGui:
 
         curr_overlay.show_all()
         self.jack_token_pos = curr_turn
+
+        # Put the investigator playing pieces on the board
+        fixed_children = self.fixed_frame.get_children()
+        for num in range (0,3):
+            if self.investigator_imgs[num] in fixed_children:
+                self.fixed_frame.remove(self.investigator_imgs[num]) 
+        for num in range (0,3):
+            ipos = wh.jack.ipos[num]
+            print(f"Investigor {num} is on {ipos}")
+            x, y = positions_dict[ipos]
+            self.fixed_frame.put(self.investigator_imgs[num], x - 5, y - INVESTIGATOR_HEIGHT)
+
+
     
     def setup(self):
+        create_positions_dictionary()
+        
         # Create the main window
         self.window = Gtk.Window()
         self.window.set_title("Whitehall Mystery Jack Automaton")
@@ -250,15 +375,24 @@ class WhiteHallGui:
         grid.attach(box, 0, 2, 1, 1)
 
         self.image_widget = Gtk.Image()
-    
+        self.fixed_frame = Gtk.Fixed()
+        self.fixed_frame.add(self.image_widget)
+
         # Create a scrolled window to contain the image widget
         image_scrolled_window = Gtk.ScrolledWindow()
         image_scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        image_scrolled_window.add(self.image_widget)
+        image_scrolled_window.add(self.fixed_frame)
 
         # Load the initial game board map view
         load_image(self.image_widget)
     
+        # TODO: this is just a test
+        drag_data1 = DragData(None, 0, 0)
+        image_scrolled_window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK)
+        image_scrolled_window.connect("motion-notify-event", self.on_motion_notify, drag_data1)
+        image_scrolled_window.connect("button-press-event", self.on_button_press, drag_data1)
+        image_scrolled_window.connect("button-release-event", self.button_release_event, drag_data1)
+        
         frame2 = Gtk.Frame()
         frame2.set_hexpand(True)
         frame2.set_vexpand(True)
@@ -297,11 +431,19 @@ class WhiteHallGui:
         # Pressing enter in the entry widget triggers the process_command() function
         self.entry.connect("activate", self.process_command)
 
+        self.investigator_imgs = []
+        for num in range (0,3):
+            i_img = Gtk.Image.new_from_file(f"images/{investigators[num]}")
+            self.investigator_imgs.append(i_img)
+            i_img.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+            i_img.connect("motion-notify-event", self.on_motion_notify)
+            i_img.connect("button-press-event", self.on_button_press)
+            
         # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
         wh.register_gui_self_test(self.self_test)
         wh.register_output_reporter(self.process_output)    
         wh.welcome()
-        self.refresh_turn_track()
+        self.refresh_board()
     
         # Connect the resize_image function to the "realize" signal of the window
         #window.connect("realize", resize_image)

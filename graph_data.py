@@ -1,4 +1,5 @@
 '''
+******************************************************************************
 MIT License
 
 Copyright (c) 2023 Brian Stormont
@@ -20,10 +21,19 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+******************************************************************************
+
+PLEASE NOTE: the following data is based on an analysis of the board game
+Whitehall Mystery, published by Fantasy Flight Games in 2016.
+
+No rights to the intellectual property of Fantasy Flight Games are expressed
+or implied.
+
+******************************************************************************
 '''
 
 quads = [[ "1", "2", "3", 
-       "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", 
+       "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18",
        "28", "29", "30", "31", "32", "33", "34", "35", "36",
        "48", "49", "50", "51", "52", "53", "54", "55",
        "68", "69", "71", "72"
@@ -49,7 +59,7 @@ quads = [[ "1", "2", "3",
 starting_ipos = [ "87c1", "86c1", "77c1", "91c1", "104c2", "106c1"]
 
 water = [ "138", "154", "157", "158", "160", "174",
-          "66", "80", "95", "96", "98", "111", "113", "110", "131", "143", "144", "166", "167", "184" 
+          "66", "80", "95", "96", "98", "111", "113", "110", "131", "143", "144", "166", "167", "184"
 ]
 
 # Edge properties (eprops) are weight and transportation type.

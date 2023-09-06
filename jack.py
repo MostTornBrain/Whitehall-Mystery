@@ -64,8 +64,8 @@ def reset_graph_color_and_shape(ug, scale=1):
     
         if 'c' in ug.vp.ids[node]:
             ug.vp.vshape[node] = "square"
-            ug.vp.vsize[node] = 8*scale
-            ug.vp.vfsize[node] = 8*scale
+            ug.vp.vsize[node] = 12*scale
+            ug.vp.vfsize[node] = 0*scale   # Don't want crossing labels
         else:
             ug.vp.vshape[node] = "circle"
             ug.vp.vsize[node] = 18*scale
@@ -208,12 +208,12 @@ class Jack:
         for clue in self.clues:
             self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = CLUE_COLOR
         
-        for pos in self.ipos:
-            self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
-        
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = YELLOW_INVESTIGATOR_COLOR
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = BLUE_INVESTIGATOR_COLOR
-        self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = RED_INVESTIGATOR_COLOR
+        #for pos in self.ipos:
+        #    self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
+        #
+        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = YELLOW_INVESTIGATOR_COLOR
+        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = BLUE_INVESTIGATOR_COLOR
+        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = RED_INVESTIGATOR_COLOR
                 
         # We don't want curved edges - define a common Bezier control so the lines are straight.
         # This will make the two edges overlap and look like a single edge with an arrow on each end.
@@ -222,11 +222,12 @@ class Jack:
         self.win = gt.graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
                       vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
                       vertex_font_size=self.graph.vp.vfsize, bg_color="white",
-                      pos=self.graph.vp.pos, output_size=(873*scale,873*scale), edge_pen_width=1*scale, edge_color=self.graph.ep.ecolor,
+                      pos=self.graph.vp.pos, output_size=(885*scale,885*scale), edge_pen_width=1*scale, edge_color=self.graph.ep.ecolor,
                       edge_marker_size=4*scale,
                       edge_control_points=control,
+                      adjust_aspect=False, fit_view=False,
                       #window=self.win, return_window=True, main=False)
-                      output="jack.png")
+                      output="images/jack.png")
         
         # Trigger the map to refresh in the GUI
         self.gui_refresh()

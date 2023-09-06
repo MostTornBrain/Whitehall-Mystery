@@ -51,7 +51,7 @@ def create_positions_dictionary():
         
     # Also create a quad tree for efficient hit detection the crossings
     for id, (x, y) in positions_dict.items():
-        quadtree.insert(item=id, bbox=(x-10, y-10, x+10, y+20))
+        quadtree.insert(item=id, bbox=(x-20, y-20, x+20, y+20))
 
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
@@ -156,8 +156,7 @@ class WhiteHallGui:
 
     def on_button_press(self, widget, event, drag_data):
         # Handle mouse button press
-        x = event.x
-        y= event.y
+        x, y = widget.translate_coordinates(self.image_widget, event.x, event.y)
         if event.button == Gdk.BUTTON_PRIMARY:
             print("Left mouse button pressed at (x={}, y={})".format(x, y))
             for num in range(0,3):

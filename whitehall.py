@@ -275,7 +275,7 @@ def command_line_ui():
 def welcome():
     jack.print("   Welcome!")
     jack.print("   Type \033[1mhelp\033[0m at any time for a full list of commands.")
-    jack.print("   Use the \033[1mipos\033[0m command to specify the investigator starting locations.")
+    jack.print("   Use your mouse to drag the investigators to starting locations.")
     jack.print("   Then type \033[1mstart\033[0m to begin the game.")
 
 def register_output_reporter(func):

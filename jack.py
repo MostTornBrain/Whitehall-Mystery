@@ -407,7 +407,18 @@ class Jack:
         v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         distance = gt.shortest_distance(self.graph, v, gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], weights=self.i_weight)
         return distance
-        
+    
+    # returns a list of crossings <= 2 spaces away
+    def investigator_crossing_options(self, num):
+        v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
+        dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
+        options = []
+        for v in visited:
+            loc = self.graph.vp.ids[self.graph.vertex(v)]
+            if "c" in loc:
+                options.append(loc)
+        return options
+    
     # Discourage Jack from taking paths near investigators by increasing the weights
     def discourage_investigators2(self, adjust):
         for num in range (0, 3):

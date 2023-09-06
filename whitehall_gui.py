@@ -32,7 +32,7 @@ investigators = ["yellow.png", "blue.png", "red.png"]
 positions_dict = {}
 quadtree = Index(bbox=(0, 0, 1500, 1500))
 SCALE = 0.78
-INVESTIGATOR_HEIGHT = 50
+INVESTIGATOR_HEIGHT = 45
 
 def is_point_within_widget(widget, x, y):
     allocation = widget.get_allocation()
@@ -107,7 +107,7 @@ class DragData:
          self.offset_y = 0
          self.investigator_id = None
          self.crossing = None
-
+         self.valid_crossings = []
 
 class WhiteHallGui:
     
@@ -141,9 +141,11 @@ class WhiteHallGui:
                 
                 # Check if we are over a crossing
                 ids = quadtree.intersect((image_x, image_y, image_x, image_y))
-                if ids and "c" in ids[0]:
+                if ids and ("c" in ids[0]) and ids[0] in drag_data.valid_crossings:
+                    # TODO:Enforce a 2 crossing movement limit unless game hasn't started or in godmode
+                    
                     (id_x, id_y) = positions_dict[ids[0]]
-                    print("Found at location with ID:", ids[0], positions_dict[ids[0]])
+                    #print("Found at location with ID:", ids[0], positions_dict[ids[0]])
                     drag_data.crossing = ids[0]
                     #Snap the image widget to the location so it looks like it is standing on it
                     allocation.x = id_x - 5
@@ -158,10 +160,10 @@ class WhiteHallGui:
         # Handle mouse button press
         x, y = widget.translate_coordinates(self.image_widget, event.x, event.y)
         if event.button == Gdk.BUTTON_PRIMARY:
-            print("Left mouse button pressed at (x={}, y={})".format(x, y))
+            #print("Left mouse button pressed at (x={}, y={})".format(x, y))
             for num in range(0,3):
                 if is_point_within_widget(self.investigator_imgs[num], x, y):
-                    print("Yo!  You clicked on ", num)
+                    #print("Yo!  You clicked on ", num)
                     drag_data.investigator_id = num
                     drag_data.crossing = wh.jack.ipos[num]  # Save starting crossing in case investigator is released before being on a new crossing
                     drag_data.widget = self.investigator_imgs[num]
@@ -170,6 +172,14 @@ class WhiteHallGui:
                     drag_data.start_y = allocation.y
                     drag_data.offset_x = drag_data.start_x - event.x
                     drag_data.offset_y = drag_data.start_y - event.y
+                    # Get a list of all crossings 2 away and save it to the drag_data
+                    drag_data.valid_crossings = wh.jack.investigator_crossing_options(num)
+                    # Remove crossings that are occupied by other investigators
+                    for pos in wh.jack.ipos:
+                        if (pos != drag_data.crossing) and (pos in drag_data.valid_crossings):
+                            drag_data.valid_crossings.remove(pos)
+                    #print(drag_data.valid_crossings)
+                    
         elif event.button == Gdk.BUTTON_SECONDARY:
             print("Right mouse button pressed")
     
@@ -304,7 +314,6 @@ class WhiteHallGui:
                 self.fixed_frame.remove(self.investigator_imgs[num]) 
         for num in range (0,3):
             ipos = wh.jack.ipos[num]
-            print(f"Investigor {num} is on {ipos}")
             x, y = positions_dict[ipos]
             self.fixed_frame.put(self.investigator_imgs[num], x - 5, y - INVESTIGATOR_HEIGHT)
 

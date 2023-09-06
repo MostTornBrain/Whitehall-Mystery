@@ -24,11 +24,13 @@ SOFTWARE.
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf, Pango, Gdk, GLib
+from pyqtree import Index
 import whitehall as wh
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 investigators = ["yellow.png", "blue.png", "red.png"]
 positions_dict = {}
+quadtree = Index(bbox=(0, 0, 1500, 1500))
 SCALE = 0.78
 INVESTIGATOR_HEIGHT = 50
 
@@ -43,9 +45,13 @@ def create_positions_dictionary():
     for item in wh.positions:
         id_value = item[0]
         x, y = item[1]
-        x = x * SCALE - 5
-        y = y * SCALE - INVESTIGATOR_HEIGHT
+        x = x * SCALE
+        y = y * SCALE
         positions_dict[id_value] = [x, y]
+        
+    # Also create a quad tree for efficient hit detection the crossings
+    for id, (x, y) in positions_dict.items():
+        quadtree.insert(item=id, bbox=(x-10, y-10, x+10, y+20))
 
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
@@ -99,6 +105,9 @@ class DragData:
          self.start_y = y
          self.offset_x = 0
          self.offset_y = 0
+         self.investigator_id = None
+         self.crossing = None
+
 
 class WhiteHallGui:
     
@@ -118,7 +127,7 @@ class WhiteHallGui:
         # Handle mouse movement
         if event.window == widget.get_window():
             pass
-            print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
+            #print(f"Mouse moved to ({x}, {y}) which is really ({image_x}, {image_y})")
             if event.state & Gdk.EventMask.BUTTON_PRESS_MASK and None != drag_data.widget :
                 drag_data.widget.set_valign(Gtk.Align.START)
                 x = int(event.x + drag_data.offset_x)
@@ -130,6 +139,19 @@ class WhiteHallGui:
                 allocation.width = drag_data.widget.get_allocation().width
                 allocation.height = drag_data.widget.get_allocation().height
                 
+                # Check if we are over a crossing
+                ids = quadtree.intersect((image_x, image_y, image_x, image_y))
+                if ids and "c" in ids[0]:
+                    (id_x, id_y) = positions_dict[ids[0]]
+                    print("Found at location with ID:", ids[0], positions_dict[ids[0]])
+                    drag_data.crossing = ids[0]
+                    #Snap the image widget to the location so it looks like it is standing on it
+                    allocation.x = id_x - 5
+                    allocation.y = id_y - INVESTIGATOR_HEIGHT
+                    # Save this new crossing as the place of origin for the inspector widget (in case we release it slightly off a crossing later)
+                    drag_data.start_x = allocation.x
+                    drag_data.start_y = allocation.y
+                    
                 drag_data.widget.size_allocate(allocation)
 
     def on_button_press(self, widget, event, drag_data):
@@ -141,6 +163,8 @@ class WhiteHallGui:
             for num in range(0,3):
                 if is_point_within_widget(self.investigator_imgs[num], x, y):
                     print("Yo!  You clicked on ", num)
+                    drag_data.investigator_id = num
+                    drag_data.crossing = wh.jack.ipos[num]  # Save starting crossing in case investigator is released before being on a new crossing
                     drag_data.widget = self.investigator_imgs[num]
                     allocation = self.investigator_imgs[num].get_allocation()
                     drag_data.start_x = allocation.x
@@ -151,10 +175,21 @@ class WhiteHallGui:
             print("Right mouse button pressed")
     
     def button_release_event(self, widget, event, drag_data):
-        if event.button == Gdk.BUTTON_PRIMARY:
+        if event.button == Gdk.BUTTON_PRIMARY and drag_data.crossing != None:
+            # Save the ipos for this widget to the game state
+            wh.jack.ipos[drag_data.investigator_id] = drag_data.crossing
+            
+            self.fixed_frame.remove(self.investigator_imgs[drag_data.investigator_id])
+            (x, y) = positions_dict[drag_data.crossing]
+            self.fixed_frame.put(self.investigator_imgs[drag_data.investigator_id], x - 5, y - INVESTIGATOR_HEIGHT)
+            
+            # clear the dragging info - we have released the investigator
             drag_data.offset_x = 0
             drag_data.offset_y = 0
             drag_data.widget = None
+            drag_data.investigator_id = None
+            drag_data.crossing = None
+            
     
     def process_output(self, output_type, *msg):
     
@@ -263,15 +298,16 @@ class WhiteHallGui:
         curr_overlay.show_all()
         self.jack_token_pos = curr_turn
 
-        # TODO: experiment to add a bitmap for an investigator
+        # Put the investigator playing pieces on the board
         fixed_children = self.fixed_frame.get_children()
         for num in range (0,3):
             if self.investigator_imgs[num] in fixed_children:
                 self.fixed_frame.remove(self.investigator_imgs[num]) 
         for num in range (0,3):
             ipos = wh.jack.ipos[num]
+            print(f"Investigor {num} is on {ipos}")
             x, y = positions_dict[ipos]
-            self.fixed_frame.put(self.investigator_imgs[num], x, y)
+            self.fixed_frame.put(self.investigator_imgs[num], x - 5, y - INVESTIGATOR_HEIGHT)
 
 
     

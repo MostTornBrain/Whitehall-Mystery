@@ -142,7 +142,7 @@ class WhiteHallGui:
                 
                 # Check if we are over a crossing
                 ids = quadtree.intersect((image_x, image_y, image_x, image_y))
-                if ids and ("c" in ids[0]) and ids[0] in drag_data.valid_crossings:
+                if ids and ("c" in ids[0]) and (ids[0] in drag_data.valid_crossings or wh.jack.godmode):
                     # TODO:Enforce a 2 crossing movement limit unless game hasn't started or in godmode
                     
                     (id_x, id_y) = positions_dict[ids[0]]
@@ -174,11 +174,14 @@ class WhiteHallGui:
                     drag_data.offset_x = drag_data.start_x - event.x
                     drag_data.offset_y = drag_data.start_y - event.y
                     # Get a list of all crossings 2 away and save it to the drag_data
-                    drag_data.valid_crossings = wh.jack.investigator_crossing_options(num)
-                    # Remove crossings that are occupied by other investigators
-                    for pos in wh.jack.ipos:
-                        if (pos != drag_data.crossing) and (pos in drag_data.valid_crossings):
-                            drag_data.valid_crossings.remove(pos)
+                    if not wh.jack.game_in_progress:
+                        drag_data.valid_crossings = wh.starting_ipos
+                    else:
+                        drag_data.valid_crossings = wh.jack.investigator_crossing_options(num)
+                        # Remove crossings that are occupied by other investigators
+                        for pos in wh.jack.ipos:
+                            if (pos != drag_data.crossing) and (pos in drag_data.valid_crossings):
+                                drag_data.valid_crossings.remove(pos)
                     #print(drag_data.valid_crossings)
                     
         elif event.button == Gdk.BUTTON_SECONDARY:

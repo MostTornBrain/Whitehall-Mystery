@@ -32,7 +32,8 @@ investigators = ["yellow.png", "blue.png", "red.png"]
 positions_dict = {}
 quadtree = Index(bbox=(0, 0, 1500, 1500))
 SCALE = 0.78
-INVESTIGATOR_HEIGHT = 45
+INVESTIGATOR_HEIGHT = 47
+INVESTIGATOR_WIDTH = 10
 
 def is_point_within_widget(widget, x, y):
     allocation = widget.get_allocation()
@@ -148,7 +149,7 @@ class WhiteHallGui:
                     #print("Found at location with ID:", ids[0], positions_dict[ids[0]])
                     drag_data.crossing = ids[0]
                     #Snap the image widget to the location so it looks like it is standing on it
-                    allocation.x = id_x - 5
+                    allocation.x = id_x - INVESTIGATOR_WIDTH
                     allocation.y = id_y - INVESTIGATOR_HEIGHT
                     # Save this new crossing as the place of origin for the inspector widget (in case we release it slightly off a crossing later)
                     drag_data.start_x = allocation.x
@@ -190,7 +191,7 @@ class WhiteHallGui:
             
             self.fixed_frame.remove(self.investigator_imgs[drag_data.investigator_id])
             (x, y) = positions_dict[drag_data.crossing]
-            self.fixed_frame.put(self.investigator_imgs[drag_data.investigator_id], x - 5, y - INVESTIGATOR_HEIGHT)
+            self.fixed_frame.put(self.investigator_imgs[drag_data.investigator_id], x - INVESTIGATOR_WIDTH, y - INVESTIGATOR_HEIGHT)
             
             # clear the dragging info - we have released the investigator
             drag_data.offset_x = 0
@@ -315,7 +316,7 @@ class WhiteHallGui:
         for num in range (0,3):
             ipos = wh.jack.ipos[num]
             x, y = positions_dict[ipos]
-            self.fixed_frame.put(self.investigator_imgs[num], x - 5, y - INVESTIGATOR_HEIGHT)
+            self.fixed_frame.put(self.investigator_imgs[num], x - INVESTIGATOR_WIDTH, y - INVESTIGATOR_HEIGHT)
 
 
     

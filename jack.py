@@ -507,14 +507,14 @@ class Jack:
 
         self.godmode_print("   removing:", prior_location)
         if prior_location in vertices_with_distance_one:
-            vertices_with_distance_one.remove(loc)
+            vertices_with_distance_one.remove(prior_location)
         self.godmode_print("These are all 1 away from ", self.pos)
         self.godmode_print(vertices_with_distance_one)
         if (len(vertices_with_distance_one) > 0):
             choice = random.choice(vertices_with_distance_one)
             self.godmode_print("Choosing:", choice)
         else:
-            choice = "NULL"
+            choice = None
         return choice
 
     
@@ -808,7 +808,7 @@ class Jack:
                 # make sure we don't use a coach to get to the goal - pick another location 1 space away
                 self.pos = self.find_adjacent_nongoal_vertex(self.path_used[-2])
                 
-                if self.pos == "NULL":
+                if self.pos == None:
                     # I _think_ this case is impossible based on the map layout, but just in case....
                     self.print("Jack \033[1mLOSES\033[0m!")
                     self.print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")

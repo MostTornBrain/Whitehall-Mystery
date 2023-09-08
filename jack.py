@@ -22,7 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import graph_tool.all as gt
+import networkx as nx
+import matplotlib.pyplot as plt
 from graph_data import *
 import random
 
@@ -35,11 +36,6 @@ DETERRENT_WEIGHTS = [6, 3, 1, 0]
 # This difficulty rating is from JACK's point of view, not the players'
 EASY_BUCKET = 0
 HARD_BUCKET = 1
-
-NORMAL_MOVE = 0
-BOAT_MOVE = 1
-ALLEY_MOVE = 2
-COACH_MOVE = 3
 
 POISON = 1000
 
@@ -59,34 +55,31 @@ CRIME_COLOR = "#dd1e1e"
 
 def reset_graph_color_and_shape(ug, scale=1):
     # iterate over all the nodes
-    for node in ug.vertices():
-        ug.vp.vcolor[node] = "#000000"
+    for node in ug.nodes():
+        ug.nodes[node]['color'] = "#000000"
     
-        if 'c' in ug.vp.ids[node]:
-            ug.vp.vshape[node] = "square"
-            ug.vp.vsize[node] = 12*scale
-            ug.vp.vfsize[node] = 0*scale   # Don't want crossing labels
+        if 'c' in node:
+            ug.nodes[node]['shape'] = "square"
+            ug.nodes[node]['size'] = 12*scale
+            ug.nodes[node]['fsize'] = 0*scale   # Don't want crossing labels
         else:
-            ug.vp.vshape[node] = "circle"
-            ug.vp.vsize[node] = 18*scale
-            ug.vp.vfsize[node] = 10*scale
+            ug.nodes[node]['shape'] = "circle"
+            ug.nodes[node]['size'] = 18*scale
+            ug.nodes[node]['fsize'] = 10*scale
 
     # Color ispector starting positions yellow
     for node in starting_ipos:
         # TODO: maybe insert another unconnected node here and make it slightly bigger to get the yellow frame?
-        v = gt.find_vertex(ug, ug.vp.ids, node)[0]
-        ug.vp.vcolor[v] = STARTING_CROSSINGS_COLOR
+        ug.nodes[node]['color'] = STARTING_CROSSINGS_COLOR
 
     # Color all the destinations in the four quadrants white
     for q in quads:
         for num in q:
-            v = gt.find_vertex(ug, ug.vp.ids, num)[0]    
-            ug.vp.vcolor[v] = "#ffffff"
+            ug.nodes[num]['color'] = "#ffffff"
 
     # Make water destinations blue
     for num in water:
-        v=gt.find_vertex(ug, ug.vp.ids, num)[0]    
-        ug.vp.vcolor[v] = WATER_COLOR
+        ug.nodes[num]['color'] = WATER_COLOR
 
 class Jack:
     def __init__(self, g, ipos):
@@ -117,19 +110,20 @@ class Jack:
         
         # Create a set of weights only used for the point of view of the investigators, 
         # so it omits alley and boat paths and it only weights entering crossings
-        self.i_weight = self.graph.new_edge_property("float")
-        self.i_weight.a = self.graph.ep.weight.a.copy()  # copy the underlying associative array
-        for e in self.graph.edges():
-            if self.graph.ep.transport[e] == NORMAL_MOVE:
-                source = self.graph.vp.ids[e.source()]
-                target = self.graph.vp.ids[e.target()]
-                if "c" in source and "c" not in target:
-                    self.i_weight[e] = 0
-                else:
-                    self.i_weight[e] = 1
-            else:
-                self.i_weight[e] = POISON    # Don't use Jack's special paths (boats and alleys)
+        
+        for u, v in self.graph.edges():
+            self.graph.edges[u, v]['i_weight'] = self.graph.edges[u, v]['weight']
             
+        for u, v in self.graph.edges():
+            if self.graph.edges[u, v]['transport'] == NORMAL_MOVE:
+                source = u
+                target = v
+                if "c" in source and "c" not in target:
+                    self.graph.edges[u, v]['i_weight'] = 0
+                else:
+                    self.graph.edges[u, v]['i_weight'] = 1
+            else:
+                self.graph.edges[u, v]['i_weight'] = POISON    # Don't use Jack's special paths (boats and alleys)
             
     def rate_quads(self):
         self.rated_quads = []
@@ -197,41 +191,46 @@ class Jack:
         if (self.godmode):
             # show Jack on the map
             for loc in self.path_used:
-                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, loc)[0]] = JACK_MOVE_COLOR
+                self.graph.nodes[loc]['color'] = JACK_MOVE_COLOR
             if hasattr(self, 'pos'):
-                self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = JACK_MOVE_COLOR
-                self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]] = "double_circle"
+                self.graph.nodes[self.pos]['color'] = JACK_MOVE_COLOR
+                self.graph.nodes[self.pos]['shape'] = "double_circle"
         
         for target in self.crimes:    
-            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]] = CRIME_COLOR
+            self.graph.nodes[target]['color'] = CRIME_COLOR
     
         for clue in self.clues:
-            self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, clue)[0]] = CLUE_COLOR
+            self.graph.nodes[clue]['color'] = CLUE_COLOR
         
-        #for pos in self.ipos:
-        #    self.graph.vp.vshape[gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]] = "hexagon"
-        #
-        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[0])[0]] = YELLOW_INVESTIGATOR_COLOR
-        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[1])[0]] = BLUE_INVESTIGATOR_COLOR
-        #self.graph.vp.vcolor[gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[2])[0]] = RED_INVESTIGATOR_COLOR
-                
-        # We don't want curved edges - define a common Bezier control so the lines are straight.
-        # This will make the two edges overlap and look like a single edge with an arrow on each end.
-        control = [0.3, 0, 0.7, 0]
-    
-        self.win = gt.graph_draw(self.graph,  vertex_text=self.graph.vp.ids, vertex_fill_color=self.graph.vp.vcolor, 
-                      vertex_shape=self.graph.vp.vshape, vertex_size=self.graph.vp.vsize,
-                      vertex_font_size=self.graph.vp.vfsize, bg_color="white",
-                      pos=self.graph.vp.pos, output_size=(885*scale,885*scale), edge_pen_width=1*scale, edge_color=self.graph.ep.ecolor,
-                      edge_marker_size=4*scale,
-                      edge_control_points=control,
-                      adjust_aspect=False, fit_view=False,
-                      #window=self.win, return_window=True, main=False)
-                      output="images/jack.png")
+        output_file="images/jack-networkx.png"
+        plt.figure(figsize=(8.85*scale, 8.85*scale))
+        
+        pos_tuples = {node: tuple(pos) for node, pos in nx.get_node_attributes(self.graph, 'pos').items()}
+        pos = nx.get_node_attributes(self.graph, 'pos')
+        node_color = nx.get_node_attributes(self.graph, 'color').values()
+        node_shape = 'o'  # Dictionary of node shapes
+        node_size = nx.get_node_attributes(self.graph, 'size').values()
+        font_size = nx.get_node_attributes(self.graph, 'fsize').values()
+        
+        print(nx.get_node_attributes(self.graph, 'size'))
+        nx.draw(self.graph,
+             node_color=node_color,
+             #node_shape=node_shape,
+             #node_size=node_size,
+             font_size=font_size,
+             pos=pos_tuples,
+             edge_color=nx.get_edge_attributes(self.graph, 'color').values(),
+             width=1*scale,
+             edgecolors='k',
+             linewidths=0.5*scale,
+        )
+        plt.gca().invert_yaxis()
+        plt.axis('off')
+        plt.savefig(output_file)
+        plt.close()
         
         # Trigger the map to refresh in the GUI
         self.gui_refresh()
-
 
     def godmode_print(self, *msg):
         if (self.godmode):
@@ -477,11 +476,10 @@ class Jack:
         
 
     def free_edge_count(self, pos):
-        raw_pos = gt.find_vertex(self.graph, self.graph.vp.ids, pos)[0]
         #calculate the out-degree but don't count boat or alley paths or poisoned paths
         out_degree = 0
-        for edge in raw_pos.out_edges():
-            if (self.graph.ep.transport[edge] == NORMAL_MOVE) and (self.graph.ep.weight[edge] < POISON):
+        for u, v in self.graph.out_edges(pos):
+            if (self.graph.edges[u, v]['transport'] == NORMAL_MOVE) and (self.graph.edges[u, v]['weight'] < POISON):
                 out_degree += 1
         return out_degree
     
@@ -493,12 +491,9 @@ class Jack:
 
     # Return the LOCATIONS (not crossings) exactly 1 space away from `source` assuming Jack's movement
     def locations_one_away(self, source):
-        pos = gt.find_vertex(self.graph, self.graph.vp.ids, source)[0]
-        dist_map = list(gt.shortest_distance(self.graph, pos, max_dist=1, weights=self.graph.ep.weight))
-        return [
-            self.graph.vp.ids[v] for v in self.graph.iter_vertices() if (dist_map[v] == 1 and 'c' not in self.graph.vp.ids[v])
-        ]
-    
+        shortest_paths = nx.single_source_dijkstra_path_length(self.graph, source, cutoff=1, weight='weight')
+        # List nodes within the maximum weighted distance
+        return [node for node in shortest_paths.keys() if 'c' not in node]
     
     def find_adjacent_nongoal_vertex(self, prior_location):
         # Jack is not allowed to move to a target destination using a coach

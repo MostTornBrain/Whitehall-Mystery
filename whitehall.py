@@ -40,7 +40,7 @@ for pair in positions:
     #jack.print(pair)
     pair[1][1] += 871
     pair[1][0] *= SCALE
-    pair[1][1] *= SCALE
+    pair[1][1] *= SCALE 
     ug.nodes[pair[0]]['pos'] = pair[1]
 
 # Print out nodes with missing positions for help when editing by hand
@@ -74,7 +74,7 @@ def parse_ipos(user_input):
         values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' not in value or not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid investigator location.")
                 break;
@@ -88,7 +88,7 @@ def parse_clues(user_input):
         values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' in value or not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid location.")
                 break;
@@ -98,7 +98,7 @@ def parse_single_location(user_input):
     if user_input:
         value = user_input
         value.strip()
-        if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+        if 'c' in value or not ug.has_node(value):
             jack.print(value, " is not a valid location.")
             value = "BAD"
     return value
@@ -107,7 +107,7 @@ def parse_single_crossing(user_input):
     if user_input:
         value = user_input
         value.strip()
-        if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+        if 'c' not in value or not ug.has_node(value):
             jack.print(value, " is not a valid crossing.")
             value = "BAD"
     return value
@@ -124,7 +124,7 @@ def parse_cost(user_input):
             jack.print("Must enter two (and only two) locations")
             return
         for value in values:
-            if len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid location.")
                 return
@@ -275,10 +275,6 @@ def game_turn():
     return turn
 
 #command_line_ui()
-
-# Save the graph so I can debug the contents to make sure I'm 
-# building it correctly and restoring weights correctly
-ug.save("my_graph_after.graphml")
 
 def check_edges():
     # Sanity check the map.  Make sure every edge is bi-directional.

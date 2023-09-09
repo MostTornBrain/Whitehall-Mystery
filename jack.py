@@ -185,6 +185,12 @@ class Jack:
         
         
     def make_image(self, scale=2):
+        # Trigger the map to refresh in the GUI
+        self.gui_refresh()
+        return
+        
+        #TODO - disabled graph rendering - will use Cairo directly
+        
         # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
         reset_graph_color_and_shape(self.graph, scale)
         
@@ -203,7 +209,16 @@ class Jack:
             self.graph.nodes[clue]['color'] = CLUE_COLOR
         
         output_file="images/jack-networkx.png"
-        plt.figure(figsize=(8.85*scale, 8.85*scale))
+        # Calculate the figure size in inches
+        dpi = 70
+        fig_width = 885*scale / dpi
+        fig_height = 885*scale / dpi
+
+        # Set the figure size using the calculated dimensions
+        plt.figure(figsize=(fig_width, fig_height))
+        # Set the axes limits
+        plt.xlim(0, 885*scale)
+        plt.ylim(0, 885*scale)
         
         pos_tuples = {node: tuple(pos) for node, pos in nx.get_node_attributes(self.graph, 'pos').items()}
         pos = nx.get_node_attributes(self.graph, 'pos')
@@ -212,25 +227,26 @@ class Jack:
         node_size = nx.get_node_attributes(self.graph, 'size').values()
         font_size = nx.get_node_attributes(self.graph, 'fsize').values()
         
-        print(nx.get_node_attributes(self.graph, 'size'))
+        print(list(font_size))
         nx.draw(self.graph,
              node_color=node_color,
              #node_shape=node_shape,
              #node_size=node_size,
-             font_size=font_size,
+             #font_size=list(font_size),
              pos=pos_tuples,
              edge_color=nx.get_edge_attributes(self.graph, 'color').values(),
              width=1*scale,
              edgecolors='k',
              linewidths=0.5*scale,
+             #with_labels=True
         )
         plt.gca().invert_yaxis()
         plt.axis('off')
         plt.savefig(output_file)
         plt.close()
-        
         # Trigger the map to refresh in the GUI
         self.gui_refresh()
+        
 
     def godmode_print(self, *msg):
         if (self.godmode):
@@ -280,9 +296,7 @@ class Jack:
         if (boats_reduced) and (len(self.boat_cards) < 2):
             self.set_travel_weight(BOAT_MOVE, 1)
         
-        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, src)[0]
-        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, dest)[0]
-        shortest = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+        shortest = nx.shortest_path_length(self.graph, source=src, target=dest, weight='weight')
 
         #re-weight the water paths if Jack still has a boat card
         if (boats_reduced) and (len(self.boat_cards) < 2):
@@ -362,19 +376,19 @@ class Jack:
 
     def find_next_location(self, vlist):
         index = 1
-        while 'c' in self.graph.vp.ids[vlist[index]]:
+        while 'c' in vlist[index]:
             index=index+1
-        return self.graph.vp.ids[vlist[index]]
+        return vlist[index]
 
     # Find the second vertex in the vlist
     def find_second_location(self, vlist):
         index = 1
-        while 'c' in self.graph.vp.ids[vlist[index]]:
+        while 'c' in vlist[index]:
             index=index+1
         index = index+1   # Skip over the first vertex
-        while 'c' in self.graph.vp.ids[vlist[index]]:
+        while 'c' in vlist[index]:
             index=index+1        
-        return self.graph.vp.ids[vlist[index]]
+        return vlist[index]
 
     # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
     # NOTE: This assumes this called alternatively with a positive then a negative value
@@ -389,51 +403,44 @@ class Jack:
                 if self.hop_count(self.ipos[num], self.pos) < 2:
                     self.is_poison.append(num)
                     self.godmode_print("Investigator #", num, "is poison.")
-                    v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
         
-                    for e in v.all_edges():
-                        self.graph.ep.weight[e] += adjust
+                    for u, v in self.graph.edges(self.ipos[num]):
+                        self.graph.edges[u,v]['weight'] += adjust
         else:
             for num in self.is_poison:
-                v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-        
-                for e in v.all_edges():
-                    self.graph.ep.weight[e] += adjust
+                for u, v in self.graph.edges(self.ipos[num]):
+                    self.graph.edges[u,v]['weight'] += adjust
             self.is_poison = [] # Discard the entries so next time this is called, we start over
 
     def investigator_distance(self, num):
         # Find the vertex belonging to the `num` ivestigator
-        v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-        distance = gt.shortest_distance(self.graph, v, gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0], weights=self.i_weight)
+        v = self.ipos[num]
+        distance = nx.shortest_path_length(self.graph, source=v, target=self.pos, weight='i_weight')
         return distance
     
     # returns a list of crossings <= 2 spaces away
     def investigator_crossing_options(self, num):
-        v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-        dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
-        options = []
-        for v in visited:
-            loc = self.graph.vp.ids[self.graph.vertex(v)]
-            if "c" in loc:
-                options.append(loc)
-        return options
+        v = self.ipos[num]
+        shortest_paths = nx.single_source_dijkstra_path_length(self.graph, v, cutoff=2, weight='i_weight')
+        # List nodes within the maximum weighted distance
+        return [node for node in shortest_paths.keys() if 'c' in node]
     
     # Discourage Jack from taking paths near investigators by increasing the weights
     def discourage_investigators2(self, adjust):
         for num in range (0, 3):
-            v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
             distance = self.investigator_distance(num)
             if (adjust > 0):
                 self.godmode_print("Investigator#", num, "at", self.ipos[num], "is", distance, "away.")
             if distance <= 3:
                 # Follow paths up to 2 spaces away (from the ivestigator's point of view)
-                v = gt.find_vertex(self.graph, self.graph.vp.ids, self.ipos[num])[0]
-                dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
-                for v in visited:
+                v = self.ipos[num]
+                #dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
+                shortest_paths = nx.single_source_dijkstra_path_length(self.graph, v, cutoff=2, weight='i_weight')
+                for v in shortest_paths.keys():
                     # Only discourage edges directly connected to a location.  Otherwise adjacent crossings poison a path too much.  Jack doesn't care about how many crossings he crosses.
-                    if "c" not in self.graph.vp.ids[self.graph.vertex(v)]:
-                        for e in self.graph.vertex(v).in_edges():
-                            self.graph.ep.weight[e] += adjust
+                    if "c" not in v:
+                        for u, v in self.graph.in_edges(v):
+                            self.graph.edges[u,v]['weight'] += adjust
                             #print("   Discourage Edge : ", self.graph.vp.ids[e.source()], self.graph.vp.ids[e.target()], self.graph.ep.weight[e])
     
     def status(self):
@@ -451,9 +458,9 @@ class Jack:
         
 
     def set_travel_weight(self, transport_type, weight):
-        for edge in self.graph.edges():
-            if self.graph.ep.transport[edge] == transport_type:
-                self.graph.ep.weight[edge] = weight
+        for u, v in self.graph.out_edges():
+            if self.graph.edges[u, v]['transport'] == transport_type:
+                self.graph.edges[u, v]['weight'] = weight
             
     
     # If Jack is running out of moves,
@@ -554,6 +561,19 @@ class Jack:
                 ret = True
         return ret
 
+    def random_shortest_path(self, source, target):
+        # Generate all shortest paths between the source and target
+        shortest_paths = list(nx.all_shortest_paths(self.graph, source, target, weight='weight'))
+
+        if not shortest_paths:
+            return None
+
+        # Choose a random shortest path
+        random_path = random.choice(shortest_paths)
+
+        return random_path
+
+    
     # Choose the path when Jack has decided he needs to use a coach
     def pick_a_coach_path(self):
         # compute shortest path without any poisoned paths since Jack can move through investigators using a coach
@@ -565,15 +585,15 @@ class Jack:
         # decide on a path
         deterrents = DETERRENT_WEIGHTS
         for deterrent in deterrents:
-            v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
-            v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
+            v1 = self.pos
+            v2 = self.active_target
 
             self.discourage_investigators2(deterrent)
-            vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
+            vlist = self.random_shortest_path(v1, v2)
             self.discourage_investigators2(-deterrent)
             
             # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
-            cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
+            cost = sum(1 for entry in vlist if 'c' not in entry) - 1
             self.godmode_print("   Considering coach cost: ", cost)
             
             # TODO: Make sure Jack doesn't choose a path 2 away from the goal as that is against the rules
@@ -596,9 +616,9 @@ class Jack:
         self.set_travel_weight(BOAT_MOVE, POISON)
         self.set_travel_weight(ALLEY_MOVE, POISON)
         
-        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, src)[0]
-        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, dest)[0]
-        path_weight = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+        v1 = src
+        v2 = dest
+        path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='weight')
         self.godmode_print("      Alley thoughts: count to get to ", dest, "is", path_weight)
         if (path_weight == 1):
             ret = True
@@ -621,25 +641,25 @@ class Jack:
         self.discourage_investigators2(deterrent)
         self.consider_desperate_weights(True)
 
-        v1 = gt.find_vertex(self.graph, self.graph.vp.ids, self.pos)[0]
+        v1 = self.pos
         
         # Consider all the targets and return the easiest to reach
         shortest_path = 1000000
         for target in self.targets:
-            v2 = gt.find_vertex(self.graph, self.graph.vp.ids, target)[0]
-            path_weight = gt.shortest_distance(self.graph, v1, v2, weights=self.graph.ep.weight)
+            v2 = target
+            path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='weight')
             self.godmode_print("   Weight to get to ", target, " is ", path_weight)
             if (path_weight < shortest_path):
                 self.active_target = target
                 shortest_path = path_weight
         
-        v2 = gt.find_vertex(self.graph, self.graph.vp.ids, self.active_target)[0]
-        vlist = gt.random_shortest_path(self.graph, v1, v2, weights=self.graph.ep.weight)
-        self.godmode_print("Considering: ", [self.graph.vp.ids[v] for v in vlist])
+        v2 = self.active_target
+        vlist = self.random_shortest_path(v1, v2)
+        self.godmode_print("Considering: ", [v for v in vlist])
         
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
-        next_dist = gt.shortest_distance(self.graph, v1, vlist[1], weights=self.graph.ep.weight)
+        next_dist = nx.shortest_path_length(self.graph, source=v1, target=vlist[1], weight='weight')
         self.godmode_print("   Next dist is:", next_dist)
         if next_dist >= POISON:
             if (len(self.coach_cards) < 2 and self.turn_count() < 13):
@@ -657,20 +677,20 @@ class Jack:
         self.consider_desperate_weights(False)
     
         # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
-        cost = sum(1 for entry in vlist if 'c' not in self.graph.vp.ids[entry]) - 1
+        cost = sum(1 for entry in vlist if 'c' not in entry) - 1
         self.godmode_print("    Cost: ", cost)
 
         # If we didn't decide we have to take a coach, figure out if it was a boat or alley move, based on the next vertex in the path
         if move_type != COACH_MOVE:
             # Going from a water space to another water space - must be using a boat
-            if ((self.pos in water) and (self.graph.vp.ids[vlist[1]] in water)):
+            if ((self.pos in water) and (vlist[1] in water)):
                 move_type = BOAT_MOVE
         
             # Jack didn't pass through any crossings - must be using an alley
-            elif 'c' not in self.graph.vp.ids[vlist[1]]:
+            elif 'c' not in vlist[1]:
                 # Confirm Jack couldn't have gotten there in 1 turn using a normal move.
                 # If he could, don't waste an alley card
-                if not self.normal_move_possible(self.pos, self.graph.vp.ids[vlist[1]]):
+                if not self.normal_move_possible(self.pos, vlist[1]):
                     move_type = ALLEY_MOVE
                 else:
                     self.godmode_print("Hmmm...   Jack thought to use an alley, but he can just walk there.")
@@ -691,7 +711,7 @@ class Jack:
             vlist, cost, move_type = self.pick_a_path_helper(deterrent)
             
             # Check to make sure we are using an alley to get to the target, as that isn't allow per the rules
-            if (move_type == ALLEY_MOVE) and (self.graph.vp.ids[vlist[1]] == self.active_target):
+            if (move_type == ALLEY_MOVE) and (vlist[1] == self.active_target):
                 self.godmode_print("Oops! Jack tried to use an alley to get to the goal.  That is not allowed.")
                 self.godmode_print("Recalculating...")
                 
@@ -750,7 +770,7 @@ class Jack:
         
         # Have you considered the advantages to taking a COACH?
         # Check if we are only moving 2 or less (either via normal move (which must be 1) or special card)
-        if (move_type != COACH_MOVE) and (self.hop_count(self.pos, self.graph.vp.ids[vlist[1]], boats_reduced=False) <= 2):
+        if (move_type != COACH_MOVE) and (self.hop_count(self.pos, vlist[1], boats_reduced=False) <= 2):
             # If we are one space away from the goal, don't use a coach, otherwise, think about it.
             if (self.hop_count(self.pos, self.active_target) != 1):
                 if self.consider_coach_move():
@@ -782,7 +802,7 @@ class Jack:
             vlist = self.pick_a_coach_path()
             self.notify_gui_of_special_travel(COACH_MOVE)
             self.godmode_print("\033[1mChoosing this for a coach path:\033[0m")
-            self.godmode_print([self.graph.vp.ids[v] for v in vlist])
+            self.godmode_print([v for v in vlist])
         
         self.pos = self.find_next_location(vlist)
         self.path_used.append(self.pos)

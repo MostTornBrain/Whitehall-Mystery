@@ -163,14 +163,16 @@ class WhiteHallGui(QWidget):
         self.update_pixmap()
         self.image_scroll_area.setWidgetResizable(True)
         self.image_scroll_area.setWidget(self.image_widget)
-
-        image_overlay = QStackedLayout()
-        image_overlay.setStackingMode(QStackedLayout.StackAll)
-        image_overlay.addWidget(self.image_scroll_area)
         
         right_widget = QWidget()
-        #right_layout = QHBoxLayout()
-        right_widget.setLayout(image_overlay)
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        
+        widget1 = QLabel("Widget 1")
+        widget1.move(50, 50)
+        
+        right_layout.addWidget(widget1)
+        right_layout.addWidget(self.image_scroll_area)
         
         # Add the widgets to the splitter
         splitter.addWidget(left_widget)

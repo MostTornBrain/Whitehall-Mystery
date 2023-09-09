@@ -36,7 +36,7 @@ from PyQt5.QtWidgets import (
     QSplitter, 
     QLineEdit,
     QStackedLayout,
-    QButtonGroup
+    QGraphicsView, QGraphicsScene, QGraphicsProxyWidget
 )
 from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtCore import Qt, QObject, QEvent
@@ -159,24 +159,29 @@ class WhiteHallGui(QWidget):
         # Scrollable Image Widget on the Right
         self.image_scroll_area = QScrollArea()
         self.image_widget = ImageLabel(self)
-                
-        self.update_pixmap()
+        self.image_widget.setFixedSize(1800, 1800)
         self.image_scroll_area.setWidgetResizable(True)
-        self.image_scroll_area.setWidget(self.image_widget)
         
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        scene = QGraphicsScene()
+        view = QGraphicsView(scene)
+        #view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+       
+        scroll_content = QWidget()
+        self.image_scroll_area.setWidget(scroll_content)
+        scroll_layout = QHBoxLayout(scroll_content)
+        scroll_layout.addWidget(view)
+        scroll_layout.setAlignment(Qt.AlignTop)  # Align the scroll layout to the top
         
-        widget1 = QLabel("Widget 1")
-        widget1.move(50, 50)
         
-        right_layout.addWidget(widget1)
-        right_layout.addWidget(self.image_scroll_area)
+        self.image_widget_proxy = scene.addWidget(self.image_widget)
+        self.update_pixmap()
+        
+        # Adjust the scene size to match the content size
+        #scene.setSceneRect(scene.itemsBoundingRect())
         
         # Add the widgets to the splitter
         splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
+        splitter.addWidget(self.image_scroll_area)
         
         # Set the size policy and Collapsible attribute of the left and right widgets
         splitter.setCollapsible(0, True)
@@ -243,10 +248,12 @@ class WhiteHallGui(QWidget):
         if pixmap.isNull():
             print("Error: can not load map image.")
             exit()
-        width = min(pixmap.width(), self.image_scroll_area.width())
+        width = min(pixmap.width(), self.image_scroll_area.width()*2)
         self.scale = pixmap.width()/width
         scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
         self.image_widget.setPixmap(scaled_pixmap)
+        self.image_widget_proxy.setPos(0,0)
+        
         
 
     def create_positions_dictionary(self):

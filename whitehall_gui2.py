@@ -24,15 +24,28 @@ SOFTWARE.
 import sys
 import signal
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QTextEdit, QLabel, QRadioButton, QSizePolicy, QSplitter, QLineEdit
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtCore import Qt
+from pyqtree import Index
+import whitehall as wh
 
+travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
+investigators = ["yellow.png", "blue.png", "red.png"]
+positions_dict = {}
+quadtree = Index(bbox=(0, 0, 1500, 1500))
+
+INVESTIGATOR_HEIGHT = 47
+INVESTIGATOR_WIDTH = 10
 MAP_BOARD_IMG = "images/jack.png"
+MAP_SCALE = 2   # scale relative to the map bitmap image and the original x, y coordinate database for the locations and crossings
 
 class WhiteHallGui(QWidget):
     def __init__(self):
         super().__init__()
 
+        # Create the dictionary and quadtree for quick location lookups
+        create_positions_dictionary()
+        
         # Main Layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -72,18 +85,15 @@ class WhiteHallGui(QWidget):
         left_layout.addWidget(self.text_entry)
         
         # Scrollable Image Widget on the Right
-        image_scroll_area = QScrollArea()
-        image_widget = QLabel()
-        pixmap = QPixmap(MAP_BOARD_IMG)
-        if pixmap.isNull():
-            print("Error: can not load map image.")  
-        image_widget.setPixmap(pixmap)
-        image_scroll_area.setWidgetResizable(True)
-        image_scroll_area.setWidget(image_widget)
+        self.image_scroll_area = QScrollArea()
+        self.image_widget = QLabel()
+        self.update_pixmap()
+        self.image_scroll_area.setWidgetResizable(True)
+        self.image_scroll_area.setWidget(self.image_widget)
         
         # Add the widgets to the splitter
         splitter.addWidget(left_widget)
-        splitter.addWidget(image_scroll_area)
+        splitter.addWidget(self.image_scroll_area)
         
         # Set the size policy and Collapsible attribute of the left and right widgets
         splitter.setCollapsible(0, True)
@@ -94,6 +104,7 @@ class WhiteHallGui(QWidget):
         # Set the sizes of the widgets in the splitter
         splitter.setSizes([self.width() // 3, 2 * self.width() // 3])
         
+        splitter.splitterMoved.connect(self.update_pixmap)
         main_layout.addWidget(splitter)
 
         # Longer Widget with Radio Buttons below
@@ -119,6 +130,29 @@ class WhiteHallGui(QWidget):
         # Add your text processing logic here
         print(f"Entered Text: {text}")
         
+    def resizeEvent(self, event):
+        self.update_pixmap()
+
+    def update_pixmap(self):
+        pixmap = QPixmap(MAP_BOARD_IMG)
+        if pixmap.isNull():
+            print("Error: can not load map image.")
+            exit()
+        width = min(pixmap.width(), self.image_scroll_area.width())
+        scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
+        self.image_widget.setPixmap(scaled_pixmap)
+        
+    def create_positions_dictionary(self):
+        for item in wh.positions:
+            id_value = item[0]
+            x, y = item[1]
+            x = x * MAP_SCALE
+            y = y * MAP_SCALE
+            positions_dict[id_value] = [x, y]
+        
+        # Also create a quad tree for efficient hit detection the crossings
+        for id, (x, y) in positions_dict.items():
+            quadtree.insert(item=id, bbox=(x-20, y-20, x+20, y+20))
     
 
 if __name__ == "__main__":

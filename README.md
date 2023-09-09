@@ -1,4 +1,4 @@
-# Whitehall Mystery
+# Whitehall Mystery Jack Automaton
 Attempt at creating a computer player for Jack for the board game Whitehall Mystery
 
 My board game group size is usually three people.   We really enjoy Whitehall Mystery, but wanted to all play investigators for a change.  Hence this project.  My main goal was to allow human players to play against a computerized Jack, initially via text entry commands specifying move actions, looking for clues, and performing arrests. A more distant goal is to perform moves via a graphical interface.
@@ -20,7 +20,7 @@ To the best of my knowledge Jack always plays by the rules.  If you notice incor
 If you want to see in detail what Jack is doing, you can enable "godmode" which is helpful for debugging and other diagnostics. When in godmode, you can move Jack to an arbitrary location to test behavior. **Enabling godmode will completely spoil the challenge of the active game. You will see Jack's path on the map as well as a transcription of where he is heading.** Use godmode only if you are curious how the Jack behavior works or are debugging the code.
 
 ## About the artwork
-All artwork used in this program has been created from scratch.  In respect of Fantasy Flight Games copyrights, no images have been copied from the original game materials. 
+All artwork used in this program has been created from scratch.  In respect of Fantasy Flight Games copyrights, no images have been copied from the original game materials.
 
 ## Theory of operation
 A di-graph was needed so a weight can be assigned to ingress edges to a location, but not to outbound edges.  This allows path distance calculation to ignore the cost of crossings, since Jack goes from location to location.  However, it also will allow the graph to be updated with weights in crossings based on the players' positions so when a "best" path is chosen, investigators can be avoided.   Similarly, weights can be assigned to water crossings and alleys to influence how likely Jack will be to use them.

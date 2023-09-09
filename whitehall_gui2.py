@@ -188,7 +188,7 @@ class WhiteHallGui(QWidget):
         
         for i in range(0, 16):
             overlay = QStackedWidget()
-            radio_button = ReadOnlyRadioButton(f"{i+1}")
+            radio_button = ReadOnlyRadioButton(f"{i}")
             radio_button.setEnabled(True)
             overlay.addWidget(radio_button)
             bottom_layout.addWidget(overlay)
@@ -270,43 +270,44 @@ class WhiteHallGui(QWidget):
             if (self.jack_token_pos != -1):
                 # Temporarily remove the jack token so it isn't counted as an extra card overlay that needs to be removed.
                 jack_overlay = self.turn_buttons[self.jack_token_pos]
-                jack_widget = jack_overlay.get_children()[-1]
+                count = jack.overlay.count()
+                jack_widget = jack_overlay.widget(count-1)
                 jack_overlay.remove(jack_widget)
     
             # remove all special transportation cards from the turn track
             for overlay in self.turn_buttons:
                 # There will only ever be at most one extra overlay per turn space
                 if overlay.count() > 1:
-                    overlay.remove(children[-1])
+                    widget = overlay.widget(1)
+                    overlay.removeWidget(widget)
     
             # put the jack token back
             if (self.jack_token_pos != -1):
-                jack_overlay.add_overlay(jack_widget)
-                jack_overlay.show_all()
+                jack_overlay.addWidget(jack_widget)
+                #jack_overlay.show_all()
         else:
             self.refresh_board()
     
     def refresh_board(self):
         curr_turn = wh.game_turn()
-        #load_image(self.image_widget)
-        #self.image_widget.queue_draw()
-        if (curr_turn > 0):
-            self.turn_buttons[curr_turn-1].widget(0).setChecked(False)
+        # Reset all the buttons since they are not part of a group - we have to set each one manually
+        for overlay in self.turn_buttons:
+            overlay.widget(0).setChecked(False)
         self.turn_buttons[curr_turn].widget(0).setChecked(True)
-        
-        return # FIXME
-        
+                
         # Move the jack token to the current turn space
         curr_overlay = self.turn_buttons[curr_turn]        
         if (self.jack_token_pos == -1):
-            image = Gtk.Image.new_from_file("images/jack-corner.png")
-            curr_overlay.add_overlay(image)
+            image = QPixmap("images/jack-corner.png")
+            image_widget = QLabel()
+            image_widget.setPixmap(image)
+            curr_overlay.addWidget(image_widget)
         elif (self.jack_token_pos != curr_turn):
             prev_overlay = self.turn_buttons[self.jack_token_pos]
             jack_widget = prev_overlay.get_children()[-1]
             prev_overlay.remove(jack_widget)
             curr_overlay.add_overlay(jack_widget)
-
+        return # FIXME
         curr_overlay.show_all()
         self.jack_token_pos = curr_turn
 

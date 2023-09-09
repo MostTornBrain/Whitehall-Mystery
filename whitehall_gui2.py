@@ -35,7 +35,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy, 
     QSplitter, 
     QLineEdit,
-    QStackedWidget,
+    QStackedLayout,
     QButtonGroup
 )
 from PyQt5.QtGui import QPixmap, QTransform
@@ -142,8 +142,8 @@ class WhiteHallGui(QWidget):
         text_scroll_area.setWidget(self.text_view)
 
         # Set the size policy of the text scroll area to occupy 1/3 of the available width
-        text_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding
-        )
+        text_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
         # Set the minimum and maximum width of the text scroll area
         text_scroll_area.setMinimumWidth(int(self.width() / 4))
 
@@ -163,10 +163,18 @@ class WhiteHallGui(QWidget):
         self.update_pixmap()
         self.image_scroll_area.setWidgetResizable(True)
         self.image_scroll_area.setWidget(self.image_widget)
+
+        image_overlay = QStackedLayout()
+        image_overlay.setStackingMode(QStackedLayout.StackAll)
+        image_overlay.addWidget(self.image_scroll_area)
+        
+        right_widget = QWidget()
+        #right_layout = QHBoxLayout()
+        right_widget.setLayout(image_overlay)
         
         # Add the widgets to the splitter
         splitter.addWidget(left_widget)
-        splitter.addWidget(self.image_scroll_area)
+        splitter.addWidget(right_widget)
         
         # Set the size policy and Collapsible attribute of the left and right widgets
         splitter.setCollapsible(0, True)
@@ -187,13 +195,16 @@ class WhiteHallGui(QWidget):
         bottom_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)  # Set fixed vertical size policy
         
         for i in range(0, 16):
-            overlay = QStackedWidget()
+            overlay = QStackedLayout()
+            overlay.setStackingMode(QStackedLayout.StackAll)
             radio_button = ReadOnlyRadioButton(f"{i}")
             radio_button.setEnabled(True)
             overlay.addWidget(radio_button)
-            bottom_layout.addWidget(overlay)
+            overlay.setAlignment(radio_button, Qt.AlignCenter)
+            bottom_layout.addLayout(overlay)
             self.turn_buttons.append(overlay)
         
+        bottom_layout.setAlignment(Qt.AlignCenter)  # Align the bottom_layout to center
         main_layout.addWidget(bottom_widget)
 
         self.setLayout(main_layout)
@@ -253,6 +264,7 @@ class WhiteHallGui(QWidget):
             add_text_with_tags(self.text_view, f"{m}\n")
     
         elif (output_type == wh.SPECIAL_TRAVEL_MSG):
+            # FIXME
             overlay = self.turn_buttons[wh.game_turn()+1]
             travel_type = msg[0]
             image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
@@ -261,24 +273,26 @@ class WhiteHallGui(QWidget):
     
             # need a second image to cover the second turn the coach took
             if travel_type == wh.COACH_MOVE:
+                # FIXME
                 overlay = self.turn_buttons[wh.game_turn()+2]
                 image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
                 overlay.add_overlay(image)
-                overlay.show_all()
+                #overlay.show_all()
         
         elif (output_type == wh.NEW_ROUND_MSG):
             if (self.jack_token_pos != -1):
                 # Temporarily remove the jack token so it isn't counted as an extra card overlay that needs to be removed.
                 jack_overlay = self.turn_buttons[self.jack_token_pos]
-                count = jack.overlay.count()
-                jack_widget = jack_overlay.widget(count-1)
-                jack_overlay.remove(jack_widget)
+                jack_widget = jack_overlay.widget(jack_overlay.count()-1)
+                jack_overlay.removeWidget(jack_widget)
+                print("Temporarilly removing", jack_widget)
     
             # remove all special transportation cards from the turn track
             for overlay in self.turn_buttons:
                 # There will only ever be at most one extra overlay per turn space
                 if overlay.count() > 1:
                     widget = overlay.widget(1)
+                    print("Removing:", widget)
                     overlay.removeWidget(widget)
     
             # put the jack token back
@@ -292,7 +306,10 @@ class WhiteHallGui(QWidget):
         curr_turn = wh.game_turn()
         # Reset all the buttons since they are not part of a group - we have to set each one manually
         for overlay in self.turn_buttons:
-            overlay.widget(0).setChecked(False)
+            for i in range (0, overlay.count()):
+                widget = overlay.widget(i)
+                if (isinstance(widget, QRadioButton)):
+                    widget.setChecked(False)
         self.turn_buttons[curr_turn].widget(0).setChecked(True)
                 
         # Move the jack token to the current turn space
@@ -300,17 +317,22 @@ class WhiteHallGui(QWidget):
         if (self.jack_token_pos == -1):
             image = QPixmap("images/jack-corner.png")
             image_widget = QLabel()
+            image_widget.setStyleSheet("border: 1px solid black;")  # Set the border style
             image_widget.setPixmap(image)
-            curr_overlay.addWidget(image_widget)
-        elif (self.jack_token_pos != curr_turn):
+            jack_layer = curr_overlay.addWidget(image_widget)
+        else:
             prev_overlay = self.turn_buttons[self.jack_token_pos]
-            jack_widget = prev_overlay.get_children()[-1]
-            prev_overlay.remove(jack_widget)
-            curr_overlay.add_overlay(jack_widget)
-        return # FIXME
-        curr_overlay.show_all()
+            jack_widget = prev_overlay.widget(prev_overlay.count()-1)
+            prev_overlay.removeWidget(jack_widget)
+            jack_layer = curr_overlay.addWidget(jack_widget)
+        print("Jack layer is", jack_layer)
+        curr_overlay.setCurrentIndex(jack_layer)
+        
+        #curr_overlay.show_all()
         self.jack_token_pos = curr_turn
-
+        
+        return # FIXME
+        
         # Put the investigator playing pieces on the board
         fixed_children = self.fixed_frame.get_children()
         for num in range (0,3):

@@ -26,9 +26,8 @@ from jack import *
 from graph_data import *
 import re
 
-SCALE=2
+SCALE=2 # How much to scale all the x, y coordinates
 
-#ug = gt.Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
 ug = nx.DiGraph()
 for edge in edge_list:
     ug.add_edge(edge[0], edge[1], weight=edge[2], transport=edge[3])

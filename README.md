@@ -7,7 +7,7 @@ NOTE: This requires the python [NetworkX](https://networkx.org/documentation/sta
 
 CAVEAT: This is still a work-in-progress.  I have transcribed the map into di-graph form and Jack is playable. The use of special cards still needs some refinement.
 
-To start, run `whitehall_gui.py`.   Assuming you have the graph-tool package installed, you should be presented with a fullscreen UI with the command-line-interface on the left and a graph view of the map state on the right.   Commands are entered in the small entry window on the lower left.
+To start, run `whitehall_gui.py`.   Assuming you have the required packages installed, you should be presented with a fullscreen UI with the command-line-interface on the left and a graph view of the map state on the right.   Commands are entered in the small entry window on the lower left.
 
 ![Starting Screen](images/whitehall.png)
 
@@ -25,7 +25,7 @@ All artwork used in this program has been created from scratch.  In respect of F
 ## Theory of operation
 A di-graph was needed so a weight can be assigned to ingress edges to a location, but not to outbound edges.  This allows path distance calculation to ignore the cost of crossings, since Jack goes from location to location.  However, it also will allow the graph to be updated with weights in crossings based on the players' positions so when a "best" path is chosen, investigators can be avoided.   Similarly, weights can be assigned to water crossings and alleys to influence how likely Jack will be to use them.
 
-Having the map as a di-graph then allows standard graph theory algorithms (from [graph-tool](https://graph-tool.skewed.de/static/doc/index.html)) to be applied for aiding Jack in his behavior.  
+Having the map as a di-graph then allows standard graph theory algorithms (from [NetworkX](https://networkx.org/documentation/stable/index.html)) to be applied for aiding Jack in his behavior.  
 
 The current investigator locations are "poisoned" with a high weight on the edges leading to/from them so Jack cannot path through them.  Also, a deterrent weight is added to all the edges radiating out from each investigator, encouraging Jack to not get too close to the investigators while Jack searches for a path to his target.  If Jack finds the shortest path cannot reach his goal within the number of moves left in the round, he will iteratively reduce the deterrent weight for the investigators until he gets a path that reaches the target before the 15 turns are up.   If Jack cannot reach *any* target given the number of turns left, he will forfeit the game.
 

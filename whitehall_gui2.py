@@ -150,6 +150,21 @@ class CustomGraphicsView(QGraphicsView):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             print("Left button released")
+            if self.drag_data.crossing != None:
+                # Save the ipos for this widget to the game state
+                wh.jack.ipos[self.drag_data.investigator_id] = self.drag_data.crossing
+            
+                (x, y) = positions_dict[self.drag_data.crossing]
+                self.gui.investigator_imgs[self.drag_data.investigator_id].setPos(
+                    (x - INVESTIGATOR_WIDTH)/self.gui.scale, (y - INVESTIGATOR_HEIGHT)/self.gui.scale)
+            
+                # clear the dragging info - we have released the investigator
+                self.drag_data.offset_x = 0
+                self.drag_data.offset_y = 0
+                self.drag_data.widget = None
+                self.drag_data.investigator_id = None
+                self.drag_data.crossing = None
+            
         elif event.button() == Qt.RightButton:
             print("Right button released")
         # Handle other mouse buttons if needed

@@ -3,7 +3,7 @@ Attempt at creating a computer player for Jack for the board game Whitehall Myst
 
 My board game group size is usually three people.   We really enjoy Whitehall Mystery, but wanted to all play investigators for a change.  Hence this project.  My main goal was to allow human players to play against a computerized Jack, initially via text entry commands specifying move actions, looking for clues, and performing arrests. A more distant goal is to perform moves via a graphical interface.
 
-NOTE: This requires the python [NetworkX](https://networkx.org/documentation/stable/index.html), [GTK+](https://python-gtk-3-tutorial.readthedocs.io/en/latest/install.html), and [pyqtree](https://pypi.org/project/Pyqtree/) libraries.
+NOTE: This requires the python [NetworkX](https://networkx.org/documentation/stable/index.html), [PyQt](https://wiki.python.org/moin/PyQt), and [pyqtree](https://pypi.org/project/Pyqtree/) libraries.
 
 CAVEAT: This is still a work-in-progress.  I have transcribed the map into di-graph form and Jack is playable. The use of special cards still needs some refinement.
 

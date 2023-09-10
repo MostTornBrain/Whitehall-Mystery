@@ -21,58 +21,40 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
-import graph_tool.all as gt
+import networkx as nx
 from jack import *
+from graph_data import *
 import re
 
-SCALE=2
+SCALE=2 # How much to scale all the x, y coordinates
 
-ug = gt.Graph(edge_list, hashed=True, eprops=[("weight", "float"), ("transport", "int")])
-
-vcolor = ug.new_vp("string")
-vshape = ug.new_vp("string")
-vsize = ug.new_vp("int")
-vfsize = ug.new_vp("int")
-ecolor = ug.new_edge_property("string")
+ug = nx.DiGraph()
+for edge in edge_list:
+    ug.add_edge(edge[0], edge[1], weight=edge[2], transport=edge[3])
 
 investigators = ["y", "b", "r"]
 
 # Assign the x-y coordinates of everything
-vpos = ug.new_vp("vector<double>")
 for pair in positions:
     #jack.print(pair)
-    v=gt.find_vertex(ug, ug.vp.ids, pair[0])[0]
     pair[1][1] += 871
     pair[1][0] *= SCALE
-    pair[1][1] *= SCALE
-    vpos[v] = pair[1]
+    pair[1][1] *= SCALE 
+    ug.nodes[pair[0]]['pos'] = pair[1]
 
 # Print out nodes with missing positions for help when editing by hand
-for node in ug.vertices():
-    if not (vpos[node]):
-        jack.print("        [\"%s\", [,-]]," % ug.vp.ids[node])
+for node in ug.nodes():
+    if 'pos' not in (ug.nodes[node]):
+        jack.print("        [\"%s\", [,-]]," % node)
 
 # We don't want the water or alley paths (edges) to be visible
-for edge in ug.edges():
-    if (ug.ep.transport[edge] == BOAT_MOVE) or (ug.ep.transport[edge] == ALLEY_MOVE):
-        ecolor[edge] = "#ffffff"
+for u, v in ug.edges():
+    if (ug.edges[u, v]['transport'] == BOAT_MOVE) or (ug.edges[u, v]['transport'] == ALLEY_MOVE):
+        ug.edges[u, v]['color'] = "#ffffff"
     else:
-        ecolor[edge] = "#000000"
-
-# Make these properties part internal to the graph so they get saved if we save the graph to a file
-ug.vp.pos = vpos
-ug.vp.vcolor = vcolor
-ug.vp.vshape = vshape
-ug.vp.vsize = vsize
-ug.vp.vfsize = vfsize
-ug.ep.ecolor = ecolor
+        ug.edges[u, v]['color'] = "#000000"
 
 reset_graph_color_and_shape(ug)
-
-# Save it so I can debug the contents to make sure I'm building it correctly
-ug.save("my_graph.graphml")
-
-# ug.list_properties()
 
 ##########################################
 
@@ -91,7 +73,7 @@ def parse_ipos(user_input):
         values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' not in value or not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid investigator location.")
                 break;
@@ -105,7 +87,7 @@ def parse_clues(user_input):
         values = match.split(',')
         values = [value.strip() for value in values]
         for value in values:
-            if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if 'c' in value or not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid location.")
                 break;
@@ -115,7 +97,7 @@ def parse_single_location(user_input):
     if user_input:
         value = user_input
         value.strip()
-        if 'c' in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+        if 'c' in value or not ug.has_node(value):
             jack.print(value, " is not a valid location.")
             value = "BAD"
     return value
@@ -124,7 +106,7 @@ def parse_single_crossing(user_input):
     if user_input:
         value = user_input
         value.strip()
-        if 'c' not in value or len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+        if 'c' not in value or not ug.has_node(value):
             jack.print(value, " is not a valid crossing.")
             value = "BAD"
     return value
@@ -141,7 +123,7 @@ def parse_cost(user_input):
             jack.print("Must enter two (and only two) locations")
             return
         for value in values:
-            if len(gt.find_vertex(ug, ug.vp.ids, value)) == 0:
+            if not ug.has_node(value):
                 values = []
                 jack.print(value, " is not a valid location.")
                 return
@@ -292,10 +274,6 @@ def game_turn():
     return turn
 
 #command_line_ui()
-
-# Save the graph so I can debug the contents to make sure I'm 
-# building it correctly and restoring weights correctly
-ug.save("my_graph_after.graphml")
 
 def check_edges():
     # Sanity check the map.  Make sure every edge is bi-directional.

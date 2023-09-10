@@ -290,21 +290,20 @@ class WhiteHallGui(QWidget):
             add_text_with_tags(self.text_view, f"{m}\n")
     
         elif (output_type == wh.SPECIAL_TRAVEL_MSG):
-            # FIXME
             overlay = self.turn_buttons[wh.game_turn()+1]
             travel_type = msg[0]
-            image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
-            overlay.add_overlay(image)
-            overlay.show_all()
-    
+            image = QPixmap(f"images/{travel_images[travel_type]}")
+            image_widget = QLabel()
+            image_widget.setPixmap(image)
+            overlay.addWidget(image_widget)
+            
             # need a second image to cover the second turn the coach took
             if travel_type == wh.COACH_MOVE:
-                # FIXME
                 overlay = self.turn_buttons[wh.game_turn()+2]
-                image = Gtk.Image.new_from_file(f"images/{travel_images[travel_type]}")
-                overlay.add_overlay(image)
-                #overlay.show_all()
-        
+                image_widget = QLabel()
+                image_widget.setPixmap(image)
+                overlay.addWidget(image_widget)
+            
         elif (output_type == wh.NEW_ROUND_MSG):
             if (self.jack_token_pos != -1):
                 # Temporarily remove the jack token so it isn't counted as an extra card overlay that needs to be removed.
@@ -357,10 +356,17 @@ class WhiteHallGui(QWidget):
             jack_layer = curr_overlay.addWidget(jack_widget)
         print("Jack layer is: ", jack_layer)
 
-        self.jack_token_pos = curr_turn
-        print("  Jack token pos is now: ", self.jack_token_pos, "\n")
+        do_it_again = False
+        if self.jack_token_pos != curr_turn:
+            self.jack_token_pos = curr_turn
+            do_it_again = True
+            print("  Jack token pos is now: ", self.jack_token_pos, "\n")
+            
         curr_overlay.setCurrentIndex(jack_layer)
-        self.position_investigators()
+        if do_it_again:
+            self.refresh_board() # FIXME: This is to get the radio button to refresh so it shows under a played card. It's an ugly hack.
+        else:
+            self.position_investigators()
 
     def position_investigators(self, add=False):
         # Put the investigator playing pieces on the board

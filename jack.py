@@ -404,11 +404,12 @@ class Jack:
                     self.is_poison.append(num)
                     self.godmode_print("Investigator #", num, "is poison.")
         
-                    for u, v in self.graph.edges(self.ipos[num]):
+                    for u, v in self.graph.in_edges(self.ipos[num]):
+                        print ("Poisoning: ", u, v)
                         self.graph.edges[u,v]['weight'] += adjust
         else:
             for num in self.is_poison:
-                for u, v in self.graph.edges(self.ipos[num]):
+                for u, v in self.graph.in_edges(self.ipos[num]):
                     self.graph.edges[u,v]['weight'] += adjust
             self.is_poison = [] # Discard the entries so next time this is called, we start over
 

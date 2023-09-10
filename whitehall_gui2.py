@@ -36,7 +36,7 @@ from PyQt5.QtWidgets import (
     QSplitter, 
     QLineEdit,
     QStackedLayout,
-    QGraphicsView, QGraphicsScene, QGraphicsProxyWidget
+    QGraphicsView, QGraphicsScene, QGraphicsProxyWidget, QGraphicsPixmapItem, QGridLayout
 )
 from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtCore import Qt, QObject, QEvent
@@ -114,10 +114,24 @@ class WhiteHallGui(QWidget):
 
         self.jack_token_pos = -1
         self.turn_buttons = []
+        self.scale = 1
         
         # Create the dictionary and quadtree for quick location lookups
         self.create_positions_dictionary()
         
+        # Create pixmaps for the investigators
+        self.investigator_imgs = []
+        self.investigator_ref_pixmaps = []
+        for num in range (0,3):
+            pixmap = QPixmap(f"images/{investigators[num]}")
+            i_img = QGraphicsPixmapItem(pixmap)
+            self.investigator_imgs.append(i_img)
+            self.investigator_ref_pixmaps.append(pixmap)
+            # TODO: Neeed some event handling for PyQt
+            #i_img.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+            #i_img.connect("motion-notify-event", self.on_motion_notify)
+            #i_img.connect("button-press-event", self.on_button_press)
+                
         # Main Layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -158,23 +172,23 @@ class WhiteHallGui(QWidget):
         
         # Scrollable Image Widget on the Right
         self.image_scroll_area = QScrollArea()
-        self.image_widget = ImageLabel(self)
-        self.image_widget.setFixedSize(1800, 1800)
         self.image_scroll_area.setWidgetResizable(True)
         
-        scene = QGraphicsScene()
-        view = QGraphicsView(scene)
-        #view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scene = QGraphicsScene()
+        view = QGraphicsView(self.scene)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
        
         scroll_content = QWidget()
         self.image_scroll_area.setWidget(scroll_content)
-        scroll_layout = QHBoxLayout(scroll_content)
+        scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.addWidget(view)
-        scroll_layout.setAlignment(Qt.AlignTop)  # Align the scroll layout to the top
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        #scroll_layout.setAlignment(Qt.AlignTop)  # Align the scroll layout to the top
         
-        
-        self.image_widget_proxy = scene.addWidget(self.image_widget)
-        self.update_pixmap()
+        self.pixmap_item = QGraphicsPixmapItem()
+
+        self.scene.addItem(self.pixmap_item)
+        self.position_investigators(add=True)
         
         # Adjust the scene size to match the content size
         #scene.setSceneRect(scene.itemsBoundingRect())
@@ -189,6 +203,7 @@ class WhiteHallGui(QWidget):
         
         # Set the size policy of the splitter
         splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
         # Set the sizes of the widgets in the splitter
         splitter.setSizes([self.width() // 3, 2 * self.width() // 3])
         
@@ -204,14 +219,16 @@ class WhiteHallGui(QWidget):
         for i in range(0, 16):
             overlay = QStackedLayout()
             overlay.setStackingMode(QStackedLayout.StackAll)
+            radio_holder = QWidget()
+            radio_holder_layout= QGridLayout(radio_holder)
             radio_button = ReadOnlyRadioButton(f"{i}")
+            radio_holder_layout.addWidget(radio_button, 0, 0, alignment=Qt.AlignCenter)
+            
             radio_button.setEnabled(True)
-            overlay.addWidget(radio_button)
-            overlay.setAlignment(radio_button, Qt.AlignCenter)
+            overlay.addWidget(radio_holder)
             bottom_layout.addLayout(overlay)
             self.turn_buttons.append(overlay)
         
-        bottom_layout.setAlignment(Qt.AlignCenter)  # Align the bottom_layout to center
         main_layout.addWidget(bottom_widget)
 
         self.setLayout(main_layout)
@@ -248,12 +265,12 @@ class WhiteHallGui(QWidget):
         if pixmap.isNull():
             print("Error: can not load map image.")
             exit()
-        width = min(pixmap.width(), self.image_scroll_area.width()*2)
+        width = min(pixmap.width(), self.image_scroll_area.width())
         self.scale = pixmap.width()/width
         scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
-        self.image_widget.setPixmap(scaled_pixmap)
-        self.image_widget_proxy.setPos(0,0)
-        
+        self.pixmap_item.setPixmap(scaled_pixmap) 
+        print("Calling refresh board from update_pixmap")
+        self.refresh_board()
         
 
     def create_positions_dictionary(self):
@@ -309,6 +326,7 @@ class WhiteHallGui(QWidget):
                 jack_overlay.addWidget(jack_widget)
                 #jack_overlay.show_all()
         else:
+            print("Calling refresh board from process_outpt")
             self.refresh_board()
     
     def refresh_board(self):
@@ -317,40 +335,45 @@ class WhiteHallGui(QWidget):
         for overlay in self.turn_buttons:
             for i in range (0, overlay.count()):
                 widget = overlay.widget(i)
-                if (isinstance(widget, QRadioButton)):
-                    widget.setChecked(False)
-        self.turn_buttons[curr_turn].widget(0).setChecked(True)
+                if not (isinstance(widget, QLabel)):
+                    widget.children()[1].setChecked(False)
+        self.turn_buttons[curr_turn].widget(0).children()[1].setChecked(True)
                 
         # Move the jack token to the current turn space
+        print("Curr turn:", curr_turn)
         curr_overlay = self.turn_buttons[curr_turn]        
         if (self.jack_token_pos == -1):
             image = QPixmap("images/jack-corner.png")
             image_widget = QLabel()
-            image_widget.setStyleSheet("border: 1px solid black;")  # Set the border style
+            #image_widget.setStyleSheet("border: 1px solid black;")  # Set the border style
             image_widget.setPixmap(image)
             jack_layer = curr_overlay.addWidget(image_widget)
         else:
+            print("Jack token pos:", self.jack_token_pos)
             prev_overlay = self.turn_buttons[self.jack_token_pos]
             jack_widget = prev_overlay.widget(prev_overlay.count()-1)
+            print("Jack widget is:", jack_widget)
             prev_overlay.removeWidget(jack_widget)
             jack_layer = curr_overlay.addWidget(jack_widget)
-        print("Jack layer is", jack_layer)
-        curr_overlay.setCurrentIndex(jack_layer)
-        
-        #curr_overlay.show_all()
+        print("Jack layer is: ", jack_layer)
+
         self.jack_token_pos = curr_turn
-        
-        return # FIXME
-        
+        print("  Jack token pos is now: ", self.jack_token_pos, "\n")
+        curr_overlay.setCurrentIndex(jack_layer)
+        self.position_investigators()
+
+    def position_investigators(self, add=False):
         # Put the investigator playing pieces on the board
-        fixed_children = self.fixed_frame.get_children()
         for num in range (0,3):
-            if self.investigator_imgs[num] in fixed_children:
-                self.fixed_frame.remove(self.investigator_imgs[num]) 
-        for num in range (0,3):
+            if add:
+                self.scene.addItem(self.investigator_imgs[num])
             ipos = wh.jack.ipos[num]
             x, y = positions_dict[ipos]
-            self.fixed_frame.put(self.investigator_imgs[num], x - INVESTIGATOR_WIDTH, y - INVESTIGATOR_HEIGHT)
+            pixmap = self.investigator_ref_pixmaps[num]
+            new_width = pixmap.width()/self.scale
+            scaled_pixmap = pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
+            self.investigator_imgs[num].setPixmap(scaled_pixmap)
+            self.investigator_imgs[num].setPos((x - INVESTIGATOR_WIDTH)/self.scale, (y - INVESTIGATOR_HEIGHT)/self.scale)
     
     def self_test(self):
         print("GUI self tests completed.")

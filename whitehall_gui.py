@@ -150,7 +150,7 @@ class CustomGraphicsView(QGraphicsView):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             #print("Left button released")
-            if self.drag_data.crossing != None:
+            if self.drag_data.crossing != None and self.drag_data.investigator_id != None:
                 # Save the ipos for this widget to the game state
                 wh.jack.ipos[self.drag_data.investigator_id] = self.drag_data.crossing
             

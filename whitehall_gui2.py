@@ -59,24 +59,6 @@ INVESTIGATOR_WIDTH = 10
 OVERLAY_WIDTH = 22
 MAP_BOARD_IMG = "images/jack.png"
 
-class ReadOnlyRadioButton(QRadioButton):
-    def __init__(self, text='', parent=None):
-        super().__init__(text, parent)
-        self.setCheckable(True)  # Make the radio button checkable
-        #self.setEnabled(False)  # Disable user interaction
-
-    def mousePressEvent(self, event):
-        event.ignore()  # Ignore the mouse press event
-
-    def mouseReleaseEvent(self, event):
-        event.ignore()  # Ignore the mouse release event
-
-    def keyPressEvent(self, event):
-        event.ignore()  # Ignore key press events
-
-    def keyReleaseEvent(self, event):
-        event.ignore()  # Ignore key release events
-
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
     # Get the current text cursor position
@@ -114,6 +96,32 @@ class ImageLabel(QLabel):
             position = event.pos()
             print(position.x() * self.master.scale, position.y() * self.master.scale)
         return super().event(event)
+
+class CustomGraphicsView(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Additional initialization if needed
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            print("Left button pressed")
+        elif event.button() == Qt.RightButton:
+            print("Right button pressed")
+        # Handle other mouse buttons if needed
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            print("Left button released")
+        elif event.button() == Qt.RightButton:
+            print("Right button released")
+        # Handle other mouse buttons if needed
+        super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event):
+        mapped_pos = self.mapToScene(event.pos())
+        print("Mouse moved to scene coordinates:", mapped_pos.x(), mapped_pos.y())
+        super().mouseMoveEvent(event)
 
 def loadQPixmap(path):
     pixmap = QPixmap(path)
@@ -196,14 +204,14 @@ class WhiteHallGui(QWidget):
         self.image_scroll_area.setWidgetResizable(True)
         
         self.scene = QGraphicsScene()
-        view = QGraphicsView(self.scene)
+        view = CustomGraphicsView(self.scene)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
        
         scroll_content = QWidget()
-        self.image_scroll_area.setWidget(scroll_content)
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.addWidget(view)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.image_scroll_area.setWidget(view)
+        #scroll_layout = QVBoxLayout(scroll_content)
+        #scroll_layout.addWidget(view)
+        #scroll_layout.setContentsMargins(0, 0, 0, 0)
         #scroll_layout.setAlignment(Qt.AlignTop)  # Align the scroll layout to the top
         
         self.pixmap_item = QGraphicsPixmapItem()
@@ -243,7 +251,7 @@ class WhiteHallGui(QWidget):
             radio_holder = QWidget()
             #radio_holder_layout= QGridLayout(radio_holder)
             radio_holder_layout= QVBoxLayout(radio_holder)
-            radio_button = CircleLabelWidget(f"{i}", 40) #ReadOnlyRadioButton()
+            radio_button = CircleLabelWidget(f"{i}", 40)
             #label = QLabel(f"{i}")
             #radio_holder_layout.addWidget(label, alignment=Qt.AlignCenter)
             radio_holder_layout.addWidget(radio_button, alignment=Qt.AlignCenter)

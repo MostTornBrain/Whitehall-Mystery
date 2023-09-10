@@ -21,6 +21,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+import whitehall as wh
+from CircleWidget import *
+from pyqtree import Index
 import sys
 import signal
 from PyQt5.QtWidgets import (
@@ -36,12 +39,15 @@ from PyQt5.QtWidgets import (
     QSplitter, 
     QLineEdit,
     QStackedLayout,
-    QGraphicsView, QGraphicsScene, QGraphicsProxyWidget, QGraphicsPixmapItem, QGridLayout
+    QGraphicsView, 
+    QGraphicsScene, 
+    QGraphicsProxyWidget, 
+    QGraphicsPixmapItem, 
+    QGridLayout
 )
 from PyQt5.QtGui import QPixmap, QTransform
 from PyQt5.QtCore import Qt, QObject, QEvent
-from pyqtree import Index
-import whitehall as wh
+
 
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 investigators = ["yellow.png", "blue.png", "red.png"]
@@ -50,6 +56,7 @@ quadtree = Index(bbox=(0, 0, 1700, 1700))
 
 INVESTIGATOR_HEIGHT = 47
 INVESTIGATOR_WIDTH = 10
+OVERLAY_WIDTH = 22
 MAP_BOARD_IMG = "images/jack.png"
 
 class ReadOnlyRadioButton(QRadioButton):
@@ -108,6 +115,14 @@ class ImageLabel(QLabel):
             print(position.x() * self.master.scale, position.y() * self.master.scale)
         return super().event(event)
 
+def loadQPixmap(path):
+    pixmap = QPixmap(path)
+    if pixmap.isNull():
+        print("Error: can not load pixmap:", path)
+        exit()
+    else:
+        return pixmap
+    
 class WhiteHallGui(QWidget):
     def __init__(self):
         super().__init__()
@@ -115,6 +130,12 @@ class WhiteHallGui(QWidget):
         self.jack_token_pos = -1
         self.turn_buttons = []
         self.scale = 1
+        
+        self.crime_dictionary = {}
+        self.crime_ref_pixmap = loadQPixmap("images/crime_overlay.png")
+        
+        self.clue_dictionary = {}
+        self.clue_ref_pixmap = loadQPixmap("images/clue_overlay.png")
         
         # Create the dictionary and quadtree for quick location lookups
         self.create_positions_dictionary()
@@ -220,11 +241,14 @@ class WhiteHallGui(QWidget):
             overlay = QStackedLayout()
             overlay.setStackingMode(QStackedLayout.StackAll)
             radio_holder = QWidget()
-            radio_holder_layout= QGridLayout(radio_holder)
-            radio_button = ReadOnlyRadioButton(f"{i}")
-            radio_holder_layout.addWidget(radio_button, 0, 0, alignment=Qt.AlignCenter)
+            #radio_holder_layout= QGridLayout(radio_holder)
+            radio_holder_layout= QVBoxLayout(radio_holder)
+            radio_button = CircleLabelWidget(f"{i}", 40) #ReadOnlyRadioButton()
+            #label = QLabel(f"{i}")
+            #radio_holder_layout.addWidget(label, alignment=Qt.AlignCenter)
+            radio_holder_layout.addWidget(radio_button, alignment=Qt.AlignCenter)
             
-            radio_button.setEnabled(True)
+            #radio_button.setEnabled(True)
             overlay.addWidget(radio_holder)
             bottom_layout.addLayout(overlay)
             self.turn_buttons.append(overlay)
@@ -261,10 +285,7 @@ class WhiteHallGui(QWidget):
         self.update_pixmap()
 
     def update_pixmap(self):
-        pixmap = QPixmap(MAP_BOARD_IMG)
-        if pixmap.isNull():
-            print("Error: can not load map image.")
-            exit()
+        pixmap = loadQPixmap(MAP_BOARD_IMG)
         width = min(pixmap.width(), self.image_scroll_area.width())
         self.scale = pixmap.width()/width
         scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
@@ -343,13 +364,22 @@ class WhiteHallGui(QWidget):
                     widget = overlay.widget(i)
                     if not (isinstance(widget, QLabel)):
                         widget.setVisible(True)
+            
+            # Remove all clues
+            for loc, item in self.clue_dictionary.items():
+                self.scene.removeItem(item)
+            self.clue_dictionary = {}
+            
+            # Remove all crimes
+            for loc, item in self.crime_dictionary.items():
+                self.scene.removeItem(item)
+            self.crime_dictionary = {}
 
         else:
             print("Calling refresh board from process_outpt")
             self.refresh_board()
     
-    def refresh_board(self):
-        curr_turn = wh.game_turn()
+    def show_current_turn(self, curr_turn):
         # Reset all the buttons since they are not part of a group - we have to set each one manually
         for overlay in self.turn_buttons:
             for i in range (0, overlay.count()):
@@ -357,7 +387,8 @@ class WhiteHallGui(QWidget):
                 if not (isinstance(widget, QLabel)):
                     widget.children()[1].setChecked(False)
         self.turn_buttons[curr_turn].widget(0).children()[1].setChecked(True)
-                
+    
+    def place_jack_on_turn_track(self, curr_turn):        
         # Move the jack token to the current turn space
         print("Curr turn:", curr_turn)
         curr_overlay = self.turn_buttons[curr_turn]        
@@ -380,7 +411,49 @@ class WhiteHallGui(QWidget):
         print("  Jack token pos is now: ", self.jack_token_pos, "\n")
             
         curr_overlay.setCurrentIndex(jack_layer)
+    
+    
+    def show_crimes(self):
+        # We need a common scaled version of the crime indication overlay
+        new_width = self.crime_ref_pixmap.width()/self.scale
+        scaled_pixmap = self.crime_ref_pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
+        
+        # Reposition all the overlays based on the current map scale, adding any newly discovered crimes as needed
+        for crime in wh.jack.crimes:
+            if crime not in self.crime_dictionary:
+                crime_img = QGraphicsPixmapItem()
+                self.crime_dictionary[crime] = crime_img
+                self.scene.addItem(crime_img)
+                
+            self.crime_dictionary[crime].setPixmap(scaled_pixmap)
+            x, y = positions_dict[crime]
+            self.crime_dictionary[crime].setPos((x - OVERLAY_WIDTH)/self.scale, (y - OVERLAY_WIDTH)/self.scale)
+    
+    def show_clues(self):
+        # We need a common scaled version of the clue indication overlay
+        new_width = self.clue_ref_pixmap.width()/self.scale
+        scaled_pixmap = self.clue_ref_pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
+        
+        # Reposition all the overlays based on the current map scale, adding any newly discovered clues as needed
+        for clue in wh.jack.clues:
+            if clue not in self.clue_dictionary:
+                clue_img = QGraphicsPixmapItem()
+                self.clue_dictionary[clue] = clue_img
+                self.scene.addItem(clue_img)
+                
+            self.clue_dictionary[clue].setPixmap(scaled_pixmap)
+            x, y = positions_dict[clue]
+            self.clue_dictionary[clue].setPos((x - OVERLAY_WIDTH)/self.scale, (y - OVERLAY_WIDTH)/self.scale)
+        
+    def refresh_board(self):
+        curr_turn = wh.game_turn()
+        
+        self.show_current_turn(curr_turn)
+        self.place_jack_on_turn_track(curr_turn)
         self.position_investigators()
+        
+        self.show_crimes()
+        self.show_clues()
 
     def position_investigators(self, add=False):
         # Put the investigator playing pieces on the board

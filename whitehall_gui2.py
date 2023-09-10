@@ -52,7 +52,7 @@ from PyQt5.QtCore import Qt, QObject, QEvent
 travel_images = ["nothing", "boat-100-white.png", "alley-100.png", "coach-100.png"]
 investigators = ["yellow.png", "blue.png", "red.png"]
 positions_dict = {}
-quadtree = Index(bbox=(0, 0, 1700, 1700))
+quadtree = Index(bbox=(0, 0, 1800, 1800))
 
 INVESTIGATOR_HEIGHT = 47
 INVESTIGATOR_WIDTH = 10
@@ -97,14 +97,51 @@ class ImageLabel(QLabel):
             print(position.x() * self.master.scale, position.y() * self.master.scale)
         return super().event(event)
 
+class DragData:
+    def __init__(self, item, x, y):
+         self.item = item
+         self.start_x = x
+         self.start_y = y
+         self.offset_x = 0
+         self.offset_y = 0
+         self.investigator_id = None
+         self.crossing = None
+         self.valid_crossings = []
+
 class CustomGraphicsView(QGraphicsView):
-    def __init__(self, parent=None):
+    def __init__(self, gui, parent=None):
         super().__init__(parent)
-        # Additional initialization if needed
+        self.gui = gui
+        self.drag_data = DragData(None, 0, 0)
 
     def mousePressEvent(self, event):
+        mapped_pos = self.mapToScene(event.pos())
         if event.button() == Qt.LeftButton:
             print("Left button pressed")
+            item = self.scene().itemAt(mapped_pos, self.transform())
+            print("Clicked on:", item)
+            print("Bounding rectangle:", item.boundingRect())
+            for num in range(0,3):
+                if item == self.gui.investigator_imgs[num]:
+                    print("You clicked on investigator:", num)
+                    self.drag_data.investigator_id = num
+                    self.drag_data.crossing = wh.jack.ipos[num]  # Save starting crossing in case investigator is released before being on a new crossing
+                    self.drag_data.item = self.gui.investigator_imgs[num]
+                    #allocation = self.investigator_imgs[num].get_allocation()
+                    self.drag_data.start_x = self.drag_data.item.pos().x()
+                    self.drag_data.start_y = self.drag_data.item.pos().y()
+                    self.drag_data.offset_x = self.drag_data.start_x - mapped_pos.x()
+                    self.drag_data.offset_y = self.drag_data.start_y - mapped_pos.y()
+                    # Get a list of all crossings 2 away and save it to the drag_data
+                    if not wh.jack.game_in_progress:
+                        self.drag_data.valid_crossings = wh.starting_ipos
+                    else:
+                        self.drag_data.valid_crossings = wh.jack.investigator_crossing_options(num)
+                        # Remove crossings that are occupied by other investigators
+                        for pos in wh.jack.ipos:
+                            if (pos != self.drag_data.crossing) and (pos in self.drag_data.valid_crossings):
+                                self.drag_data.valid_crossings.remove(pos)
+                    break;
         elif event.button() == Qt.RightButton:
             print("Right button pressed")
         # Handle other mouse buttons if needed
@@ -121,6 +158,30 @@ class CustomGraphicsView(QGraphicsView):
     def mouseMoveEvent(self, event):
         mapped_pos = self.mapToScene(event.pos())
         print("Mouse moved to scene coordinates:", mapped_pos.x(), mapped_pos.y())
+        if None != self.drag_data.item :
+            x = mapped_pos.x() + self.drag_data.offset_x
+            y = mapped_pos.y() + self.drag_data.offset_y
+                        
+            # Check if we are over a crossing
+            qx = mapped_pos.x()*self.gui.scale
+            qy = mapped_pos.y()*self.gui.scale
+            print("Looking for crossing at:", qx, qy)
+            id_list = quadtree.intersect((qx, qy, qx, qy))
+            if id_list and ("c" in id_list[0]) and (id_list[0] in self.drag_data.valid_crossings or wh.jack.godmode):
+                # Enforce a 2 crossing movement limit unless game hasn't started or in godmode
+                
+                (id_x, id_y) = positions_dict[ id_list[0]]
+                print("Found at location with ID:", id_list[0], positions_dict[ id_list[0]])
+                self.drag_data.crossing = id_list[0]
+                #Snap the image widget to the location so it looks like it is standing on it
+                x = (id_x - INVESTIGATOR_WIDTH)/self.gui.scale
+                y = (id_y - INVESTIGATOR_HEIGHT)/self.gui.scale
+                # Save this new crossing as the place of origin for the inspector widget (in case we release it slightly off a crossing later)
+                self.drag_data.start_x = x
+                self.drag_data.start_y = y
+                
+            self.drag_data.item.setPos(x, y)
+        
         super().mouseMoveEvent(event)
 
 def loadQPixmap(path):
@@ -204,15 +265,11 @@ class WhiteHallGui(QWidget):
         self.image_scroll_area.setWidgetResizable(True)
         
         self.scene = QGraphicsScene()
-        view = CustomGraphicsView(self.scene)
+        view = CustomGraphicsView(self, parent=self.scene)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
        
         scroll_content = QWidget()
         self.image_scroll_area.setWidget(view)
-        #scroll_layout = QVBoxLayout(scroll_content)
-        #scroll_layout.addWidget(view)
-        #scroll_layout.setContentsMargins(0, 0, 0, 0)
-        #scroll_layout.setAlignment(Qt.AlignTop)  # Align the scroll layout to the top
         
         self.pixmap_item = QGraphicsPixmapItem()
 
@@ -234,7 +291,7 @@ class WhiteHallGui(QWidget):
         splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # Set the sizes of the widgets in the splitter
-        splitter.setSizes([self.width() // 3, 2 * self.width() // 3])
+        splitter.setSizes([self.width() // 8, 7 * self.width() // 8])
         
         splitter.splitterMoved.connect(self.update_pixmap)
         main_layout.addWidget(splitter)
@@ -266,7 +323,8 @@ class WhiteHallGui(QWidget):
         self.setLayout(main_layout)
         self.setWindowTitle("Whitehall Mystery Jack Automaton")
         
-        # Pass a function and some necessary UI elements to the game engine so it can post things to the GUI with the proper context
+        # Pass a function and some necessary UI elements to the game engine 
+        # so it can post things to the GUI with the proper context
         wh.register_gui_self_test(self.self_test)
         wh.register_output_reporter(self.process_output)    
         wh.welcome()
@@ -483,7 +541,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     window = WhiteHallGui()
-    window.show()
+    window.showMaximized()
 
 
 

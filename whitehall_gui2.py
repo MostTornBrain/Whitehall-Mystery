@@ -117,13 +117,13 @@ class CustomGraphicsView(QGraphicsView):
     def mousePressEvent(self, event):
         mapped_pos = self.mapToScene(event.pos())
         if event.button() == Qt.LeftButton:
-            print("Left button pressed")
+            #print("Left button pressed")
             item = self.scene().itemAt(mapped_pos, self.transform())
-            print("Clicked on:", item)
-            print("Bounding rectangle:", item.boundingRect())
+            #print("Clicked on:", item)
+            #print("Bounding rectangle:", item.boundingRect())
             for num in range(0,3):
                 if item == self.gui.investigator_imgs[num]:
-                    print("You clicked on investigator:", num)
+                    #print("You clicked on investigator:", num)
                     self.drag_data.investigator_id = num
                     self.drag_data.crossing = wh.jack.ipos[num]  # Save starting crossing in case investigator is released before being on a new crossing
                     self.drag_data.item = self.gui.investigator_imgs[num]
@@ -149,7 +149,7 @@ class CustomGraphicsView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
-            print("Left button released")
+            #print("Left button released")
             if self.drag_data.crossing != None:
                 # Save the ipos for this widget to the game state
                 wh.jack.ipos[self.drag_data.investigator_id] = self.drag_data.crossing
@@ -172,7 +172,7 @@ class CustomGraphicsView(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         mapped_pos = self.mapToScene(event.pos())
-        print("Mouse moved to scene coordinates:", mapped_pos.x(), mapped_pos.y())
+        #print("Mouse moved to scene coordinates:", mapped_pos.x(), mapped_pos.y())
         if None != self.drag_data.item :
             x = mapped_pos.x() + self.drag_data.offset_x
             y = mapped_pos.y() + self.drag_data.offset_y
@@ -180,13 +180,13 @@ class CustomGraphicsView(QGraphicsView):
             # Check if we are over a crossing
             qx = mapped_pos.x()*self.gui.scale
             qy = mapped_pos.y()*self.gui.scale
-            print("Looking for crossing at:", qx, qy)
+            #print("Looking for crossing at:", qx, qy)
             id_list = quadtree.intersect((qx, qy, qx, qy))
             if id_list and ("c" in id_list[0]) and (id_list[0] in self.drag_data.valid_crossings or wh.jack.godmode):
                 # Enforce a 2 crossing movement limit unless game hasn't started or in godmode
                 
                 (id_x, id_y) = positions_dict[ id_list[0]]
-                print("Found at location with ID:", id_list[0], positions_dict[ id_list[0]])
+                #print("Found at location with ID:", id_list[0], positions_dict[ id_list[0]])
                 self.drag_data.crossing = id_list[0]
                 #Snap the image widget to the location so it looks like it is standing on it
                 x = (id_x - INVESTIGATOR_WIDTH)/self.gui.scale
@@ -371,7 +371,7 @@ class WhiteHallGui(QWidget):
         self.scale = pixmap.width()/width
         scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
         self.pixmap_item.setPixmap(scaled_pixmap) 
-        print("Calling refresh board from update_pixmap")
+        #print("Calling refresh board from update_pixmap")
         self.refresh_board()
         
 
@@ -424,14 +424,14 @@ class WhiteHallGui(QWidget):
                 jack_overlay = self.turn_buttons[self.jack_token_pos]
                 jack_widget = jack_overlay.widget(jack_overlay.count()-1)
                 jack_overlay.removeWidget(jack_widget)
-                print("Temporarilly removing", jack_widget)
+                #print("Temporarilly removing", jack_widget)
     
             # remove all special transportation cards from the turn track
             for overlay in self.turn_buttons:
                 # There will only ever be at most one extra overlay per turn space
                 if overlay.count() > 1:
                     widget = overlay.widget(1)
-                    print("Removing:", widget)
+                    #print("Removing:", widget)
                     overlay.removeWidget(widget)
     
             # put the jack token back
@@ -457,7 +457,7 @@ class WhiteHallGui(QWidget):
             self.crime_dictionary = {}
 
         else:
-            print("Calling refresh board from process_outpt")
+            #print("Calling refresh board from process_outpt")
             self.refresh_board()
     
     def show_current_turn(self, curr_turn):
@@ -471,7 +471,7 @@ class WhiteHallGui(QWidget):
     
     def place_jack_on_turn_track(self, curr_turn):        
         # Move the jack token to the current turn space
-        print("Curr turn:", curr_turn)
+        #print("Curr turn:", curr_turn)
         curr_overlay = self.turn_buttons[curr_turn]        
         if (self.jack_token_pos == -1):
             image = QPixmap("images/jack-corner.png")
@@ -480,16 +480,16 @@ class WhiteHallGui(QWidget):
             image_widget.setPixmap(image)
             jack_layer = curr_overlay.addWidget(image_widget)
         else:
-            print("Jack token pos:", self.jack_token_pos)
+            #print("Jack token pos:", self.jack_token_pos)
             prev_overlay = self.turn_buttons[self.jack_token_pos]
             jack_widget = prev_overlay.widget(prev_overlay.count()-1)
-            print("Jack widget is:", jack_widget)
+            #print("Jack widget is:", jack_widget)
             prev_overlay.removeWidget(jack_widget)
             jack_layer = curr_overlay.addWidget(jack_widget)
-        print("Jack layer is: ", jack_layer)
+        #print("Jack layer is: ", jack_layer)
 
         self.jack_token_pos = curr_turn
-        print("  Jack token pos is now: ", self.jack_token_pos, "\n")
+        #print("  Jack token pos is now: ", self.jack_token_pos, "\n")
             
         curr_overlay.setCurrentIndex(jack_layer)
     

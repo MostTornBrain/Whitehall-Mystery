@@ -405,7 +405,7 @@ class Jack:
                     self.godmode_print("Investigator #", num, "is poison.")
         
                     for u, v in self.graph.in_edges(self.ipos[num]):
-                        print ("Poisoning: ", u, v)
+                        #print ("Poisoning: ", u, v)
                         self.graph.edges[u,v]['weight'] += adjust
         else:
             for num in self.is_poison:
@@ -455,7 +455,7 @@ class Jack:
         self.print("Moves remaining: ", 16 - self.turn_count())
         self.godmode_print("Here is the path Jack took:", self.path_used)
         self.godmode_print("Targets: ", self.targets)
-        print
+        #print
         
 
     def set_travel_weight(self, transport_type, weight):

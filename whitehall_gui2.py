@@ -297,12 +297,24 @@ class WhiteHallGui(QWidget):
             image_widget.setPixmap(image)
             overlay.addWidget(image_widget)
             
+            # Hide the radio button
+            for i in range (0, overlay.count()):
+                widget = overlay.widget(i)
+                if not (isinstance(widget, QLabel)):
+                    widget.hide()
+            
             # need a second image to cover the second turn the coach took
             if travel_type == wh.COACH_MOVE:
                 overlay = self.turn_buttons[wh.game_turn()+2]
                 image_widget = QLabel()
                 image_widget.setPixmap(image)
                 overlay.addWidget(image_widget)
+                
+                # Hide the radio button
+                for i in range (0, overlay.count()):
+                    widget = overlay.widget(i)
+                    if not (isinstance(widget, QLabel)):
+                        widget.hide()
             
         elif (output_type == wh.NEW_ROUND_MSG):
             if (self.jack_token_pos != -1):
@@ -324,6 +336,14 @@ class WhiteHallGui(QWidget):
             if (self.jack_token_pos != -1):
                 jack_overlay.addWidget(jack_widget)
                 #jack_overlay.show_all()
+            
+            # Make all the radio buttons visible again
+            for overlay in self.turn_buttons:
+                for i in range (0, overlay.count()):
+                    widget = overlay.widget(i)
+                    if not (isinstance(widget, QLabel)):
+                        widget.setVisible(True)
+
         else:
             print("Calling refresh board from process_outpt")
             self.refresh_board()
@@ -356,17 +376,11 @@ class WhiteHallGui(QWidget):
             jack_layer = curr_overlay.addWidget(jack_widget)
         print("Jack layer is: ", jack_layer)
 
-        do_it_again = False
-        if self.jack_token_pos != curr_turn:
-            self.jack_token_pos = curr_turn
-            do_it_again = True
-            print("  Jack token pos is now: ", self.jack_token_pos, "\n")
+        self.jack_token_pos = curr_turn
+        print("  Jack token pos is now: ", self.jack_token_pos, "\n")
             
         curr_overlay.setCurrentIndex(jack_layer)
-        if do_it_again:
-            self.refresh_board() # FIXME: This is to get the radio button to refresh so it shows under a played card. It's an ugly hack.
-        else:
-            self.position_investigators()
+        self.position_investigators()
 
     def position_investigators(self, add=False):
         # Put the investigator playing pieces on the board

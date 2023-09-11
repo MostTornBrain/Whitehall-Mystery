@@ -13,7 +13,10 @@ To start, run `whitehall_gui.py`.   Assuming you have the required packages inst
 
 Type `help` at the prompt to get a full list of commands.  
 
-**Please note**: rules enforcement is assumed to be performed by the players.  Other than validating locations actually exist, there is no enforcement of where an investigator can move nor where clues or arrests can be mode.   However, when searching for clues using the `clues` command, if you provide a list, it will stop searching as soon as a clue is found, per the rules.  So, if Jack had visited locations 52 and 53, typing `clues 52, 53, 55` would only reveal a clue was found at 52.  But, the game will not check if the investigator were close enough to actually perform a clue search.  The players must ensure they enter legal searchs.  A future enhancement will add more rules enforcement for the players.
+**Please note**: rules enforcement is assumed to be performed by the human players.  There is a rough attempt by this program
+to enforce some of the rules. Locations for searching for clues and making arrests must be adjacent to an investigator.  When searching for clues using the `clues` command, if you provide a list, it will stop searching as soon as a clue is found, per the rules.  So, if Jack had visited locations 52 and 53, typing `clues 52, 53, 55` would only reveal a clue was found at 52.  But, the game will prevent you from issuing another clue search command.
+
+Once a search is made for clues or an arrest is attempted, the game will prevent the players from moving the investigators.  It will display a message stating it is now Jack's turn to move.
 
 To the best of my knowledge Jack always plays by the rules.  If you notice incorrect behavior for Jack, please let me know.
 

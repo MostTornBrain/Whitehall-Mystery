@@ -23,7 +23,6 @@ SOFTWARE.
 '''
 
 import networkx as nx
-import matplotlib.pyplot as plt
 from graph_data import *
 import random
 

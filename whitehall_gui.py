@@ -108,6 +108,7 @@ class DragData:
          self.crossing = None
          self.valid_crossings = []
 
+
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, gui, parent=None):
         super().__init__(parent)
@@ -117,6 +118,13 @@ class CustomGraphicsView(QGraphicsView):
     def mousePressEvent(self, event):
         mapped_pos = self.mapToScene(event.pos())
         if event.button() == Qt.LeftButton:
+            if not wh.jack.godmode and wh.jack.it_is_jacks_turn:
+                self.drag_data.item = None
+                self.drag_data.investigator_id = None
+                self.drag_data.crossing = None
+                wh.jack.print("Investigators may not move after searching for clues or attempting an arrest.")
+                wh.jack.print("Type <b>jack</b> when you are ready to have Jack take his turn.")
+                return
             #print("Left button pressed")
             item = self.scene().itemAt(mapped_pos, self.transform())
             #print("Clicked on:", item)
@@ -161,7 +169,7 @@ class CustomGraphicsView(QGraphicsView):
                 # clear the dragging info - we have released the investigator
                 self.drag_data.offset_x = 0
                 self.drag_data.offset_y = 0
-                self.drag_data.widget = None
+                self.drag_data.item = None
                 self.drag_data.investigator_id = None
                 self.drag_data.crossing = None
             

@@ -89,7 +89,7 @@ class Jack:
         self.godmode = False
         self.win = None
         self.pos = 0
-        
+        self.it_is_jacks_turn = False
         self.game_in_progress = False
         
         self.targets = []
@@ -259,6 +259,7 @@ class Jack:
             self.targets.append(random.choice(q[difficulty]))
 
     def reset(self):
+        self.it_is_jacks_turn = False
         self.game_in_progress = True
         self.targets = []
         self.crimes = []
@@ -729,6 +730,9 @@ class Jack:
         return [vlist, cost, move_type]
         
     def move(self):
+        # Jack is taking his turn, so it is no longer his turn. ;-P
+        self.it_is_jacks_turn = False
+        
         if (not self.game_in_progress):
             self.print("No game in progress, please \033[1mstart\033[0m a game before trying to move Jack.")
             return
@@ -848,8 +852,30 @@ class Jack:
             return
         self.make_image()
 
+    def is_loc_adjacent(self, loc):
+        loc_good = False
+        for num in range(0,3):
+            if nx.shortest_path_length(self.graph, source=self.ipos[num], target=loc, weight='i_weight') == 0:
+                loc_good = True
+                break;
+        if not loc_good:
+            self.print("\033[1m", loc, "\033[0m is not adjacent to any investigator.")
+            self.print("Please enter a valid location list.")
+        return loc_good
+            
     def clue_search(self, pos_list):
-        #TODO: verify clue location is next to an ipos?  Or just have players enforce the rules themselves.
+        # Set flag to prevent players from moving after they started searching for clues
+        self.it_is_jacks_turn = True
+        
+        for loc in pos_list:
+            if loc in self.crimes:
+                self.print("\033[1m", loc, "\033[0m is a crime location.  Please enter a valid location list.")
+                return;
+
+            # verify clue location is next to an ipos
+            if not self.godmode and not self.is_loc_adjacent(loc):
+                return
+                
         self.print("\nSearching for clues at: ", pos_list)
         for loc in pos_list:
             if loc in self.path_used:
@@ -861,38 +887,18 @@ class Jack:
                 self.print(loc, ": no clue")
 
     def arrest(self, pos):
-        #TODO: verify arrest location is next to an ipos?  Or just have players enforce the rules themselves.
+        # Set flag to prevent players from moving after they performed an arrest
+        self.it_is_jacks_turn = True
+        
+        #verify arrest location is next to an ipos
+        if not self.godmode and not self.is_loc_adjacent(pos):
+            return
+            
         if pos == self.pos:
             self.print("Congratulations!  You \033[1marrested\033[0m Jack at location ", pos, "!")
             self.print("Here is the path he took:", self.path_used)
             self.game_in_progress = False
         else:
             self.print("Jack is not at location ", pos)
-
-'''
-    def find_next_ilocation(self, vlist, id_list):
-        index = 1
-        while (index < len(vlist)-1) and 'c' not in id_list[vlist[index]]:
-            index=index+1
-    
-        # Don't move the inspector onto a destination
-        if 'c' not in id_list[vlist[index]]:
-            index = 0
-
-        return id_list[vlist[index]]
-
-    # Let investigators always move towards Jack to test Jack's algorithm
-    def move_investigators(g, ipos, jack_pos):
-        for num in range (0, 3):
-            v1 = gt.find_vertex(g, g.vp.ids, ipos[num])[0]
-            v2 = gt.find_vertex(g, g.vp.ids, jack_pos)[0]
-            vlist, elist = shortest_path(g, v1, v2)
-            #print([g.vp.ids[v] for v in vlist])
-        
-            pos = find_next_ilocation(vlist, g.vp.ids)
-            ipos[num]=pos
-            print("Inspector #" + str(num) + " moved to " + pos +" and is now " + 
-                str(gt.shortest_distance(g, gt.find_vertex(g, g.vp.ids, pos)[0], v2)) + " distance")
-'''            
         
         

@@ -58,6 +58,7 @@ INVESTIGATOR_HEIGHT = 47
 INVESTIGATOR_WIDTH = 10
 OVERLAY_WIDTH = 22
 MAP_BOARD_IMG = "images/jack.png"
+JACK_FIG_IMG = "images/jack_fig.png"
 
 # Recognize the ANSI escape sequence for BOLD text
 def add_text_with_tags(text_view, text):
@@ -229,6 +230,9 @@ class WhiteHallGui(QWidget):
         self.clue_dictionary = {}
         self.clue_ref_pixmap = loadQPixmap("images/clue_overlay.png")
         
+        self.jack_path_dictionary = {}
+        self.jack_path_ref_pixmap = loadQPixmap("images/jack_path_overlay.png")
+        
         # Create the dictionary and quadtree for quick location lookups
         self.create_positions_dictionary()
         
@@ -244,7 +248,11 @@ class WhiteHallGui(QWidget):
             #i_img.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
             #i_img.connect("motion-notify-event", self.on_motion_notify)
             #i_img.connect("button-press-event", self.on_button_press)
-                
+        
+        pixmap = QPixmap(JACK_FIG_IMG)
+        self.jack_fig_ref_pixmap = pixmap
+        self.jack_fig_item = QGraphicsPixmapItem(pixmap)
+        
         # Main Layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -298,9 +306,6 @@ class WhiteHallGui(QWidget):
 
         self.scene.addItem(self.pixmap_item)
         self.position_investigators(add=True)
-        
-        # Adjust the scene size to match the content size
-        #scene.setSceneRect(scene.itemsBoundingRect())
         
         # Add the widgets to the splitter
         splitter.addWidget(left_widget)
@@ -398,6 +403,7 @@ class WhiteHallGui(QWidget):
         if (output_type == wh.TEXT_MSG):
             m = ' '.join(str(arg) for arg in msg)
             add_text_with_tags(self.text_view, f"{m}\n")
+            self.text_view.verticalScrollBar().setValue(self.text_view.verticalScrollBar().maximum())
     
         elif (output_type == wh.SPECIAL_TRAVEL_MSG):
             overlay = self.turn_buttons[wh.game_turn()+1]
@@ -463,6 +469,11 @@ class WhiteHallGui(QWidget):
             for loc, item in self.crime_dictionary.items():
                 self.scene.removeItem(item)
             self.crime_dictionary = {}
+            
+            # Remove all godmode Jack path indicators
+            for loc, item in self.jack_path_dictionary.items():
+                self.scene.removeItem(item)
+            self.jack_path_dictionary = {}
 
         else:
             #print("Calling refresh board from process_outpt")
@@ -543,6 +554,12 @@ class WhiteHallGui(QWidget):
         
         self.show_crimes()
         self.show_clues()
+        
+        self.do_godmode_board_update()
+        
+        # Adjust the scene size to match the content size
+        self.scene.setSceneRect(self.scene.itemsBoundingRect())
+    
 
     def position_investigators(self, add=False):
         # Put the investigator playing pieces on the board
@@ -556,6 +573,40 @@ class WhiteHallGui(QWidget):
             scaled_pixmap = pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
             self.investigator_imgs[num].setPixmap(scaled_pixmap)
             self.investigator_imgs[num].setPos((x - INVESTIGATOR_WIDTH)/self.scale, (y - INVESTIGATOR_HEIGHT)/self.scale)
+    
+
+    def do_godmode_board_update(self):
+        if wh.jack.pos == 0:
+            self.jack_fig_item.setVisible(False)
+        else:
+            if not self.jack_fig_item in self.scene.items():
+                self.scene.addItem(self.jack_fig_item)
+            x, y = positions_dict[wh.jack.pos]
+            pixmap = self.jack_fig_ref_pixmap
+            new_width = pixmap.width()/self.scale
+            scaled_pixmap = pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
+            self.jack_fig_item.setPixmap(scaled_pixmap)
+            self.jack_fig_item.setPos((x - INVESTIGATOR_WIDTH)/self.scale, (y - INVESTIGATOR_HEIGHT)/self.scale)
+            if not wh.jack.godmode:
+                self.jack_fig_item.setVisible(False)
+            else:
+                self.jack_fig_item.setVisible(True)
+                
+                # Show Jack's prior movements
+                # We need a common scaled version of the clue indication overlay
+                new_width = self.jack_path_ref_pixmap.width()/self.scale
+                scaled_pixmap = self.jack_path_ref_pixmap.scaledToWidth(int(new_width), Qt.SmoothTransformation)
+    
+                for path in wh.jack.path_used:
+                    if path not in self.jack_path_dictionary:
+                        path_img = QGraphicsPixmapItem()
+                        self.jack_path_dictionary[path] = path_img
+                        self.scene.addItem(path_img)
+            
+                    self.jack_path_dictionary[path].setPixmap(scaled_pixmap)
+                    x, y = positions_dict[path]
+                    self.jack_path_dictionary[path].setPos((x - OVERLAY_WIDTH)/self.scale, (y - OVERLAY_WIDTH)/self.scale)
+            
     
     def self_test(self):
         print("GUI self tests completed.")

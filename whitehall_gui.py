@@ -205,7 +205,7 @@ class CustomGraphicsView(QGraphicsView):
                 self.drag_data.start_y = y
                 
             self.drag_data.item.setPos(x, y)
-        
+            self.gui.view.viewport().update() # On Windows 10, the pixmap would sometime leave behind ghost pieces.  Hopefully this fixes that.
         super().mouseMoveEvent(event)
 
 def loadQPixmap(path):
@@ -296,11 +296,11 @@ class WhiteHallGui(QWidget):
         self.image_scroll_area.setWidgetResizable(True)
         
         self.scene = QGraphicsScene()
-        view = CustomGraphicsView(self, parent=self.scene)
-        view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.view = CustomGraphicsView(self, parent=self.scene)
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
        
         scroll_content = QWidget()
-        self.image_scroll_area.setWidget(view)
+        self.image_scroll_area.setWidget(self.view)
         
         self.pixmap_item = QGraphicsPixmapItem()
 

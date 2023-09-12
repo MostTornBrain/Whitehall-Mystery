@@ -127,7 +127,7 @@ def parse_cost(user_input):
                 values = []
                 jack.print(value, " is not a valid location.")
                 return
-        jack.print(jack.hop_count(values[0], values[1]))
+        jack.print(nx.shortest_path_length(jack.graph, source=values[0], target=values[1], weight='safety_weight'))
                 
                 
                 

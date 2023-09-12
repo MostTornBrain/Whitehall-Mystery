@@ -610,10 +610,18 @@ class WhiteHallGui(QWidget):
     
     def self_test(self):
         print("GUI self tests completed.")
-    
+
+def handle_abort(signal, frame):
+    print("Wah?")
+    import traceback
+    traceback.print_stack(frame)
+    exit(0)
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, handle_abort)
+    
     window = WhiteHallGui()
     window.showMaximized()
 

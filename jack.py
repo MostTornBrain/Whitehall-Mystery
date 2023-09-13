@@ -28,7 +28,7 @@ import random
 
 # How many extra turns should Jack leave as "buffer" for completing his path
 TURN_BUFFER = 3
-DEFAULT_WATER_WEIGHT = 3
+DEFAULT_WATER_WEIGHT = 1  # Experimental: Using safety weights, treat water like any other path as it will have a high weight due to there only being 1 exit at each end.
 DEFAULT_ALLEY_WEIGHT = 13
 DETERRENT_WEIGHTS = [6, 3, 1, 0]
 
@@ -105,7 +105,11 @@ class Jack:
         self.path_used = []
         
         # Rate all the potential target locations
+        self.rate_nodes()
         self.rate_quads()
+        
+        # Experimental - use weighted paths based on how "safe" the location is
+        self.weight_for_safety()
         
         # Create a set of weights only used for the point of view of the investigators, 
         # so it omits alley and boat paths and it only weights entering crossings
@@ -124,17 +128,44 @@ class Jack:
             else:
                 self.graph.edges[u, v]['i_weight'] = POISON    # Don't use Jack's special paths (boats and alleys)
             
+    def node_safety_weight(self, loc):
+        weight_adjust = 0
+        if loc in self.node_safety:
+            safety = self.node_safety[loc]
+            weight_adjust = (self.max_safety - safety)/10
+        return weight_adjust
+        
+    def rate_nodes(self):
+        self.node_safety = {}
+        self.max_safety = 0 
+        for loc, (x, y) in positions:
+            if 'c' not in loc:
+                self.node_safety[loc] = self.location_safety_rating(loc)
+                if self.node_safety[loc] > self.max_safety:
+                    self.max_safety = self.node_safety[loc]
+
+    def weight_for_safety(self):
+        self.set_travel_weight(BOAT_MOVE, DEFAULT_WATER_WEIGHT)
+        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+        
+        for u, v in self.graph.edges():
+            weight_adjust = self.node_safety_weight(v)
+            self.graph.edges[u, v]['safety_weight'] =  weight_adjust + self.graph.edges[u, v]['weight']
+            #print ("weighting", u, v, self.graph.edges[u, v]['safety_weight'], " was:", self.graph.edges[u, v]['weight'])
+
+    
     def rate_quads(self):
         self.rated_quads = []
+
         for q in quads:
             min = 1000
             max = 0
             total = 0 
             count = 0
             
-            # First pass: compute the range and average of the group
+            # First pass: compute the range and average of the quad group
             for t in q:
-                rating = self.location_safety_rating(t)
+                rating = self.node_safety[t]
                 if rating < min:
                     min = rating
                 if rating > max:
@@ -149,7 +180,7 @@ class Jack:
             # Second pass: put each into the proper graded bucket
             quad_bucket = [[],[],[]]
             for t in q:
-                rating = self.location_safety_rating(t)
+                rating = self.node_safety[t]
                 if rating >= avg:
                     quad_bucket[EASY_BUCKET].append(t)
                 # For now, only using 2 difficulty levels as using 3 limited the choices for easy and hard for certain quads
@@ -165,7 +196,7 @@ class Jack:
         self.output_func = func
         
     def log_to_file(self, *msg):
-        print(*msg, file=self.file)
+        print(*msg, file=self.file, flush=True)
         
     def print(self, *msg):
         if (self.output_func == None):
@@ -186,71 +217,12 @@ class Jack:
     def make_image(self, scale=2):
         # Trigger the map to refresh in the GUI
         self.gui_refresh()
-        return
-        
-        #TODO - disabled graph rendering - will use Cairo directly
-        
-        # Recolor the graph from scratch - yes, it's inefficient, but easier to do than undo previous ipos coloring, etc.
-        reset_graph_color_and_shape(self.graph, scale)
-        
-        if (self.godmode):
-            # show Jack on the map
-            for loc in self.path_used:
-                self.graph.nodes[loc]['color'] = JACK_MOVE_COLOR
-            if hasattr(self, 'pos'):
-                self.graph.nodes[self.pos]['color'] = JACK_MOVE_COLOR
-                self.graph.nodes[self.pos]['shape'] = "double_circle"
-        
-        for target in self.crimes:    
-            self.graph.nodes[target]['color'] = CRIME_COLOR
-    
-        for clue in self.clues:
-            self.graph.nodes[clue]['color'] = CLUE_COLOR
-        
-        output_file="images/jack-networkx.png"
-        # Calculate the figure size in inches
-        dpi = 70
-        fig_width = 885*scale / dpi
-        fig_height = 885*scale / dpi
-
-        # Set the figure size using the calculated dimensions
-        plt.figure(figsize=(fig_width, fig_height))
-        # Set the axes limits
-        plt.xlim(0, 885*scale)
-        plt.ylim(0, 885*scale)
-        
-        pos_tuples = {node: tuple(pos) for node, pos in nx.get_node_attributes(self.graph, 'pos').items()}
-        pos = nx.get_node_attributes(self.graph, 'pos')
-        node_color = nx.get_node_attributes(self.graph, 'color').values()
-        node_shape = 'o'  # Dictionary of node shapes
-        node_size = nx.get_node_attributes(self.graph, 'size').values()
-        font_size = nx.get_node_attributes(self.graph, 'fsize').values()
-        
-        print(list(font_size))
-        nx.draw(self.graph,
-             node_color=node_color,
-             #node_shape=node_shape,
-             #node_size=node_size,
-             #font_size=list(font_size),
-             pos=pos_tuples,
-             edge_color=nx.get_edge_attributes(self.graph, 'color').values(),
-             width=1*scale,
-             edgecolors='k',
-             linewidths=0.5*scale,
-             #with_labels=True
-        )
-        plt.gca().invert_yaxis()
-        plt.axis('off')
-        plt.savefig(output_file)
-        plt.close()
-        # Trigger the map to refresh in the GUI
-        self.gui_refresh()
-        
 
     def godmode_print(self, *msg):
         if (self.godmode):
             self.print(*msg)
-        self.log_to_file(*msg)
+        else:
+            self.log_to_file(*msg)
 
     def pick_the_targets(self, difficulty):
         # Choose the 4 targets for the game
@@ -386,10 +358,28 @@ class Jack:
         while 'c' in vlist[index]:
             index=index+1
         index = index+1   # Skip over the first vertex
-        while 'c' in vlist[index]:
-            index=index+1        
-        return vlist[index]
+        
+        if index < len(vlist):
+            while 'c' in vlist[index]:
+                index=index+1
+            ret = vlist[index]
+        else:
+            # No item left in list, so pick a random neighbor, but it can't be where Jack started nor his goal
+            choices = self.locations_one_away(self.pos)
+            if self.active_target in choices:
+                choices.remove(self.active_target)
+            if vlist[0] in choices:
+                choices.remove(vlist[0])
+            ret = random.choice(choices)
+            
+        return ret
 
+    def poison_location(self, loc, adjust):
+        self.godmode_print("Poisoning: ", loc, adjust)
+        for u, v in self.graph.in_edges(loc):
+            self.graph.edges[u,v]['safety_weight'] += adjust
+            self.graph.edges[u,v]['weight'] += adjust
+            
     # Poison all the paths (i.e. edges) that go through an inspector (i.e. ipos) as Jack isn't allowed to use those
     # NOTE: This assumes this called alternatively with a positive then a negative value
     #       It saves the list of poisoned locations, then the next call uses that list for the unpoisoning
@@ -399,18 +389,17 @@ class Jack:
 
         if len(self.is_poison) == 0:
             for num in range (0, 3):
-                # Only poison if the investigator crossing can be reached by Jack in less than 2 moves
-                if self.hop_count(self.ipos[num], self.pos) < 2:
+                # Only poison if the investigator crossing can be reached by Jack in less than 3 moves
+                if self.hop_count(self.ipos[num], self.pos) <= 2:
                     self.is_poison.append(num)
                     self.godmode_print("Investigator #", num, "is poison.")
-        
-                    for u, v in self.graph.in_edges(self.ipos[num]):
-                        #print ("Poisoning: ", u, v)
-                        self.graph.edges[u,v]['weight'] += adjust
+                    self.poison_location(self.ipos[num], adjust)
+                    
+            self.godmode_print("Poisoned investigators...", self.is_poison, adjust)
         else:
+            self.godmode_print("Unpoisoning investigators...", self.is_poison, adjust)
             for num in self.is_poison:
-                for u, v in self.graph.in_edges(self.ipos[num]):
-                    self.graph.edges[u,v]['weight'] += adjust
+                self.poison_location(self.ipos[num], adjust)
             self.is_poison = [] # Discard the entries so next time this is called, we start over
 
     def investigator_distance(self, num):
@@ -432,17 +421,15 @@ class Jack:
             distance = self.investigator_distance(num)
             if (adjust > 0):
                 self.godmode_print("Investigator#", num, "at", self.ipos[num], "is", distance, "away.")
-            if distance <= 3:
-                # Follow paths up to 2 spaces away (from the ivestigator's point of view)
+            if distance <= 4:
                 v = self.ipos[num]
-                #dist_map, visited = list(gt.shortest_distance(self.graph, v, max_dist=2, weights=self.i_weight, return_reached=True))
+                # Follow paths up to 2 spaces away (from the investigator's point of view)
                 shortest_paths = nx.single_source_dijkstra_path_length(self.graph, v, cutoff=2, weight='i_weight')
                 for v in shortest_paths.keys():
                     # Only discourage edges directly connected to a location.  Otherwise adjacent crossings poison a path too much.  Jack doesn't care about how many crossings he crosses.
                     if "c" not in v:
                         for u, v in self.graph.in_edges(v):
-                            self.graph.edges[u,v]['weight'] += adjust
-                            #print("   Discourage Edge : ", self.graph.vp.ids[e.source()], self.graph.vp.ids[e.target()], self.graph.ep.weight[e])
+                            self.graph.edges[u,v]['safety_weight'] += adjust
     
     def status(self):
         self.print()
@@ -459,25 +446,16 @@ class Jack:
         
 
     def set_travel_weight(self, transport_type, weight):
+        #self.godmode_print("set_travel_weight:", transport_type, weight)
         for u, v in self.graph.out_edges():
             if self.graph.edges[u, v]['transport'] == transport_type:
                 self.graph.edges[u, v]['weight'] = weight
-            
+                self.graph.edges[u, v]['safety_weight'] = weight + self.node_safety_weight(v)
     
     # If Jack is running out of moves,
-    # or he is trying to reach the final target, 
-    # then reduce the weights of water if he still has boat cards
+    # then reduce the weights of alley moves if he still has alley cards
     def consider_desperate_weights(self, enabled):
-        # TODO: consider alley weights
-        if (self.turn_count() > 9) or (len(self.targets) == 1):
-            if (enabled):
-                weight = 1
-                self.godmode_print("Jack is desperate")
-            else:
-                weight = DEFAULT_WATER_WEIGHT
-            
-            if (len(self.boat_cards) < 2):
-                self.set_travel_weight(BOAT_MOVE, weight)
+        return
 
     def turn_count(self):
         return len(self.path_used)
@@ -493,25 +471,27 @@ class Jack:
     
     # Compute the safety rating of a location - HIGHER is SAFER
     def location_safety_rating(self, pos):
-        one_away = self.locations_one_away(pos)
+        one_away = len(self.locations_one_away(pos))
         out_degree = self.free_edge_count(pos)
-        return len(one_away) * out_degree
+        return one_away * out_degree
 
     # Return the LOCATIONS (not crossings) exactly 1 space away from `source` assuming Jack's movement
     def locations_one_away(self, source):
         shortest_paths = nx.single_source_dijkstra_path_length(self.graph, source, cutoff=1, weight='weight')
         # List nodes within the maximum weighted distance
-        return [node for node in shortest_paths.keys() if 'c' not in node]
+        locs = [node for node in shortest_paths.keys() if 'c' not in node]
+        locs.remove(source)
+        return locs
     
-    def find_adjacent_nongoal_vertex(self, prior_location):
+    def find_adjacent_nongoal_vertex(self):
         # Jack is not allowed to move to a target destination using a coach
         # Pick another vertex that is 1 space away and isn't where he was previously, since that is also against the rules
-        vertices_with_distance_one = self.locations_one_away(self.pos)
+        vertices_with_distance_one = self.locations_one_away(self.active_target)
 
-        self.godmode_print("   removing:", prior_location)
-        if prior_location in vertices_with_distance_one:
-            vertices_with_distance_one.remove(prior_location)
-        self.godmode_print("These are all 1 away from ", self.pos)
+        self.godmode_print("   removing:", self.pos)
+        if self.pos in vertices_with_distance_one:
+            vertices_with_distance_one.remove(self.pos)
+        self.godmode_print("These are all 1 away from ", self.active_target)
         self.godmode_print(vertices_with_distance_one)
         if (len(vertices_with_distance_one) > 0):
             choice = random.choice(vertices_with_distance_one)
@@ -564,7 +544,7 @@ class Jack:
 
     def random_shortest_path(self, source, target):
         # Generate all shortest paths between the source and target
-        shortest_paths = list(nx.all_shortest_paths(self.graph, source, target, weight='weight'))
+        shortest_paths = list(nx.all_shortest_paths(self.graph, source, target, weight='safety_weight'))
 
         if not shortest_paths:
             return None
@@ -587,19 +567,23 @@ class Jack:
         deterrents = DETERRENT_WEIGHTS
         for deterrent in deterrents:
             v1 = self.pos
-            v2 = self.active_target
+            
+            # Can't go to the active_target, so pick a random location 1 away from it
+            # and poison the active_target so Jack does not travel through it. 
+            # (It's not 100% clear in the rules if he could not travel through it as the 
+            # intermediate move, but I'll not allow it to be safe.)
+            v2 = self.find_adjacent_nongoal_vertex()
+            self.poison_location(self.active_target, POISON)
 
             self.discourage_investigators2(deterrent)
             vlist = self.random_shortest_path(v1, v2)
             self.discourage_investigators2(-deterrent)
+            self.poison_location(self.active_target, -POISON)
             
             # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
             cost = sum(1 for entry in vlist if 'c' not in entry) - 1
             self.godmode_print("   Considering coach cost: ", cost)
-            
-            # TODO: Make sure Jack doesn't choose a path 2 away from the goal as that is against the rules
-            # NOTE: we currently enforce this rule elsewhere in the code in move().
-                
+                            
             if (cost <= (16 - self.turn_count())):
                 self.godmode_print("   Jack finds this coach cost acceptable.")
                 break;
@@ -619,7 +603,7 @@ class Jack:
         
         v1 = src
         v2 = dest
-        path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='weight')
+        path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='safety_weight')
         self.godmode_print("      Alley thoughts: count to get to ", dest, "is", path_weight)
         if (path_weight == 1):
             ret = True
@@ -640,7 +624,6 @@ class Jack:
         # TODO: if getting close to the end of the round and still have coach cards, maybe don't poison inspector paths and if one is chosen, use a coach?
         self.poison_investigators(POISON)
         self.discourage_investigators2(deterrent)
-        self.consider_desperate_weights(True)
 
         v1 = self.pos
         
@@ -648,8 +631,19 @@ class Jack:
         shortest_path = 1000000
         for target in self.targets:
             v2 = target
-            path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='weight')
+            try:
+                path_weight = nx.shortest_path_length(self.graph, source=v1, target=v2, weight='safety_weight')
+            except ValueError as e:
+                print("Noooo!")
+                for u, v in self.graph.edges():
+                    print(u, v, self.graph.edges[u, v]['safety_weight'])
+                exit(0)
             self.godmode_print("   Weight to get to ", target, " is ", path_weight)
+            if path_weight < 0:
+                print("Noooo!")
+                for u, v in self.graph.edges():
+                    print(u, v, self.graph.edges[u, v]['safety_weight'])
+                exit(0)
             if (path_weight < shortest_path):
                 self.active_target = target
                 shortest_path = path_weight
@@ -660,22 +654,47 @@ class Jack:
         
         # Detect when surrounded (i.e shortest path to the next vertex is > 1000) and 
         # determine if any move is possible or if Jack is trapped and loses.
-        next_dist = nx.shortest_path_length(self.graph, source=v1, target=vlist[1], weight='weight')
+        next_loc = self.find_next_location(vlist)
+        next_dist = nx.shortest_path_length(self.graph, source=v1, target=next_loc, weight='safety_weight')
         self.godmode_print("   Next dist is:", next_dist)
         if next_dist >= POISON:
-            if (len(self.coach_cards) < 2 and self.turn_count() < 13):
-                # do coach move
-                self.godmode_print("Must use a coach!")
-                move_type = COACH_MOVE
+            # If getting to the next location goes through a blocked path, 
+            # Jack is either surrounded (and must take a coach) or the goal is 1 away and is blocked, 
+            # so he must pick a different place to go
+            if next_loc != self.active_target:
+                if (len(self.coach_cards) < 2 and self.turn_count() < 13):
+                    # do coach move
+                    self.godmode_print("Must use a coach!")
+                    move_type = COACH_MOVE
+                else:
+                    self.print("Jack cannot move.  You win!")
+                    self.print("Jack's current position: ", self.pos)
+                    self.game_in_progress = False
             else:
-                self.print("Jack cannot move.  You win!")
-                self.print("Jack's current position: ", self.pos)
-                self.game_in_progress = False
+                try_count = 0
+                while (next_dist >= POISON):
+                    self.godmode_print("   Ouch! Goal is blocked!")
+                    # Trying to reach goal.  Must pick a different spot as the goal is surrounded.
+                    candidates = locations_one_away(self.pos)
+                    if self.active_target in candidates:
+                        candidates.remove(self.active_target)
+                    new_loc = random.choice(candidates)
+                    self.godmode_print(f"    Let's visit {new_loc} instead.")
+                    vlist = self.random_shortest_path(v1, new_loc)
+                    next_dist = nx.shortest_path_length(self.graph, source=v1, target=new_loc, weight='safety_weight')
+                    self.godmode_print("   Next dist is:", next_dist)
+                    try_count += 1
+                    
+                    # safety valve - I don't think we should ever have this happen....
+                    if try_count > 5:
+                        self.print("Jack cannot move.  You win!")
+                        self.print("Jack's current position: ", self.pos)
+                        self.game_in_progress = False
+                        break;
 
         # un-poison the ipos edges
         self.poison_investigators(-POISON)
         self.discourage_investigators2(-deterrent)
-        self.consider_desperate_weights(False)
     
         # Compute the cost of this chosen path.  Easiest to just count the entries that aren't crossing
         cost = sum(1 for entry in vlist if 'c' not in entry) - 1
@@ -706,24 +725,31 @@ class Jack:
     def pick_a_path(self, deterrent):        
         path_ok = False
         alleys_poison = False
+        alley_dest = []
         
         # Need to loop in case an alley was chosen for the final target.
         while(not path_ok):
             vlist, cost, move_type = self.pick_a_path_helper(deterrent)
-            
-            # Check to make sure we are using an alley to get to the target, as that isn't allow per the rules
+            # Check to make sure we are not using an alley to get to the target, as that isn't allow per the rules
             if (move_type == ALLEY_MOVE) and (vlist[1] == self.active_target):
                 self.godmode_print("Oops! Jack tried to use an alley to get to the goal.  That is not allowed.")
                 self.godmode_print("Recalculating...")
                 
-                # Make so Jack won't consider an alley
-                self.set_travel_weight(ALLEY_MOVE, POISON)
+                # Make so Jack won't consider that specific alley
+                self.graph.edges[self.pos, self.active_target]['safety_weight'] = POISON + self.node_safety_weight(self.active_target)
+                self.graph.edges[self.pos, self.active_target]['weight'] = POISON
                 alleys_poison = True
+                # We can potentially get a new target from `pick_a_path_helper()` so we need to save the current poisoned one
+                # for later unpoisoning
+                alley_dest.append(self.active_target)
             else: 
                 path_ok = True
                 if (alleys_poison):
                     if (len(self.alley_cards) < 2):
-                        self.set_travel_weight(ALLEY_MOVE, DEFAULT_ALLEY_WEIGHT)
+                        for dest in alley_dest:
+                            self.graph.edges[self.pos, dest]['safety_weight'] = DEFAULT_ALLEY_WEIGHT + self.node_safety_weight(self.active_target)
+                            self.graph.edges[self.pos, dest]['weight'] = POISON
+                            self.godmode_print("Unoopsie poisoning", self.graph.edges[self.pos, dest]['safety_weight'])
                     alleys_poison = False
         
         return [vlist, cost, move_type]
@@ -821,20 +847,7 @@ class Jack:
             self.coach_cards.append(self.turn_count()-1)
             self.godmode_print("\nJack moves to -> " + self.pos + " and is " + str(shortest) + " away.")
             
-            if (shortest > 1):
-                self.pos = self.find_second_location(vlist)
-            else:
-                # make sure we don't use a coach to get to the goal - pick another location 1 space away
-                self.pos = self.find_adjacent_nongoal_vertex(self.path_used[-2])
-                
-                if self.pos == None:
-                    # I _think_ this case is impossible based on the map layout, but just in case....
-                    self.print("Jack \033[1mLOSES\033[0m!")
-                    self.print("Jack tried to use a coach, but his goal was 2 spaces away and according to the rules a coach cannot be used for going directly to his goal.")
-                    self.print("Jack tried to find another location 1 space away, but there was no other legal place to move, so he is trapped.")
-                    self.print("Jack was at location " + prior_location + " and is currently at " + self.pos)
-                    self.print("Here is the full path he took:", self.path_used)
-                    return
+            self.pos = self.find_second_location(vlist)
             self.path_used.append(self.pos)
             
             # Count how far away the goal is now that Jack moved
@@ -848,6 +861,8 @@ class Jack:
         if (16 - self.turn_count() < shortest):
             self.print("Jack LOSES!  He cannot reach his target with the number of moves left.")
             self.print("Here is the path he took:", self.path_used)
+            self.print("His remaining target goals were:")
+            self.print(self.targets)
             return
         self.make_image()
 
@@ -896,6 +911,8 @@ class Jack:
         if pos == self.pos:
             self.print("Congratulations!  You \033[1marrested\033[0m Jack at location ", pos, "!")
             self.print("Here is the path he took:", self.path_used)
+            self.print("His remaining target goals were:")
+            self.print(self.targets)
             self.game_in_progress = False
         else:
             self.print("Jack is not at location ", pos)

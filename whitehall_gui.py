@@ -267,7 +267,7 @@ class WhiteHallGui(QWidget):
         left_widget = QWidget()
         left_widget.setLayout(left_layout)
         left_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(5, 0, 0, 0)
         
         # Scrollable Text Widget on the Left
         text_scroll_area = QScrollArea()

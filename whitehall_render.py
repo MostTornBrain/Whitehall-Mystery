@@ -121,7 +121,7 @@ class BaseGraphView(QMainWindow):
 
                 self.pixmap = QPixmap(1770, 1770)
                 
-        self.pixmap.fill(Qt.white)  # Fill pixmap with white color
+        self.pixmap.fill(Qt.transparent)
 
         # Create a QPainter object and render the scene onto it
         painter = QPainter(self.pixmap)

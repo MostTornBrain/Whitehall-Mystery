@@ -19,4 +19,6 @@
 * Have an alternate set of weights based on the "safety" rating of the vertices
 * Have a function to save the weights and to restore the weights rather than applying negative weights and restoring default boat and alley weights after?
 * Have a "wild goose" mode Jack can enter if he has a large turn buffer available, we he heads in a random "safe" direction.
+* Leave a ghost image of the imvestigator after moving so you know where you started. Have the ghost disappear once clues, arrest, or jack moves.
+
 

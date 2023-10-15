@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+import whitehall_render as wr
 import whitehall as wh
 from CircleWidget import *
 from pyqtree import Index
@@ -57,7 +58,6 @@ quadtree = Index(bbox=(0, 0, 1800, 1800))
 INVESTIGATOR_HEIGHT = 47
 INVESTIGATOR_WIDTH = 10
 OVERLAY_WIDTH = 22
-MAP_BOARD_IMG = "images/jack.png"
 JACK_FIG_IMG = "images/jack_fig.png"
 
 # Recognize the ANSI escape sequence for BOLD text
@@ -379,10 +379,10 @@ class WhiteHallGui(QWidget):
         self.update_pixmap()
 
     def update_pixmap(self):
-        pixmap = loadQPixmap(MAP_BOARD_IMG)
-        width = min(pixmap.width(), self.image_scroll_area.width())
-        self.scale = pixmap.width()/width
-        scaled_pixmap = pixmap.scaledToWidth(width, Qt.SmoothTransformation)
+        # NOTE: the board_graph_img is created globally at the start of the program
+        width = min(board_graph_img.width(), self.image_scroll_area.width())
+        self.scale = board_graph_img.width()/width
+        scaled_pixmap = board_graph_img.scaledToWidth(width, Qt.SmoothTransformation)
         self.pixmap_item.setPixmap(scaled_pixmap) 
         #print("Calling refresh board from update_pixmap")
         self.refresh_board()
@@ -611,6 +611,7 @@ class WhiteHallGui(QWidget):
     def self_test(self):
         print("GUI self tests completed.")
 
+# Only used for debugging
 def handle_abort(signal, frame):
     print("Wah?")
     import traceback
@@ -620,11 +621,14 @@ def handle_abort(signal, frame):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    signal.signal(signal.SIGINT, handle_abort)
+    #signal.signal(signal.SIGINT, handle_abort)   # only enabled for debugging
     
+    # Generate the base image for the board based on the nodes and edges defined.
+    board_graph = wr.BaseGraphView(wh.positions, wh.edge_list)
+    board_graph_img = board_graph.getPixmap()
+    
+    # start the game
     window = WhiteHallGui()
     window.showMaximized()
-
-
 
     sys.exit(app.exec_())
